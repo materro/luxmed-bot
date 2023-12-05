@@ -101,7 +101,7 @@ object Pl extends Lang {
 
   override def rebookIfExists: String = "<b>➡</b> Czy chcesz zaktualizować termin, jeśli rezerwacja już istnieje?"
 
-  override def pleaseSpecifyOffset: String = "<b>➡</b> Podaj offset w godzinach albo kliknij Nie"
+  override def pleaseSpecifyOffset: String = "<b>➡</b> Podaj offset w minutach albo kliknij Nie"
 
   override def visitAlreadyExists: String =
     "<b>➡</b> Wizyta została juz zarezerwowana. Czy chcesz zaktualizować jej termin?"
@@ -187,7 +187,7 @@ object Pl extends Lang {
        |/history - historia wizyt
        |/accounts - zarządzanie kontami Luxmed
        |/login - ponowne logowanie
-       |/settings - ustawienia, np. język
+       |/settings - ustawienia, np. język i offset
        |/help - pomoc""".stripMargin
 
   override def dateFromIs(dateFrom: LocalDateTime): String = s"📅 Data od ${formatDate(dateFrom, locale)}"
@@ -334,7 +334,7 @@ object Pl extends Lang {
   override def configureOffset: String = "<b>➡</b> Wybierz opcje offsetu"
 
   override def pleaseEnterOffset(current: Int): String =
-    s"<b>➡</b> Podaj domyślny offset. Obecny offset: <b>$current</b>"
+    s"<b>➡</b> Podaj domyślny offset w minutach. Obecny offset: <b>$current</b>"
 
   override def alwaysAskOffset(enabled: Boolean): String = s"${if (enabled) "✅ " else ""}Zawsze pytaj o offset"
 

@@ -103,7 +103,7 @@ class MonitoringService extends StrictLogging {
   }
 
   private def optimizeDateFrom(date: LocalDateTime, offset: Int) = {
-    val nowWithOffset = LocalDateTime.now().plusHours(offset)
+    val nowWithOffset = LocalDateTime.now().plusMinutes(offset)
     if (date.isBefore(nowWithOffset)) nowWithOffset else date
   }
 
