@@ -13,12 +13,13 @@ object ApiHttp
     )
 
 trait ApiBase {
+  val uuid = java.util.UUID.randomUUID.toString.toUpperCase
   private val CommonHeaders =
     Map(
       Host -> "portalpacjenta.luxmed.pl",
       Origin -> "https://portalpacjenta.luxmed.pl",
-      `Custom-User-Agent` -> "PatientPortal; 4.29.0; 12345678-3F3C-2C63-375B-BBA12392F44C; iOS; 17.1.1; iPhone14,5",
-      `User-Agent` -> "Mozilla/5.0 (iPhone; CPU iPhone OS 16_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
+      `Custom-User-Agent` -> s"PatientPortal; 4.29.0; $uuid; iOS; 17.1.1; iPhone14,5",
+      `User-Agent` -> "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
       Accept -> "application/json, text/plain, */*",
       `Accept-Encoding` -> "gzip, deflate, br",
       `Accept-Language` -> "pl;q=1.0, pl;q=0.9, en;q=0.8"
