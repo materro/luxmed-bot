@@ -123,3 +123,10 @@ gradle-app.setting
 /**/*.iml
 /docker/version
 /docker/secrets.env
+
+run-luxmed-bot.sh
+start-bot.sh
+stop-bot.sh
+kill-bot.sh
+check-bot-status.sh
+
