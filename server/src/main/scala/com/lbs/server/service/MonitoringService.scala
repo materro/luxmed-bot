@@ -38,11 +38,11 @@ class MonitoringService extends StrictLogging {
 
   private val monitoringExecutor = new Scheduler(10)
 
-  private val MaxDelay = 10.minute
+  private val MaxDelay = 6.minute
 
-  private val PeriodBase = 10.minute
+  private val PeriodBase = 6.minute
 
-  private val PeriodMaxDelta = 5.minute
+  private val PeriodMaxDelta = 3.minute
 
   private def delay = Random.nextInt(MaxDelay.toSeconds.toInt).seconds
 
