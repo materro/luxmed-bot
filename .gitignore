@@ -129,4 +129,5 @@ start-bot.sh
 stop-bot.sh
 kill-bot.sh
 check-bot-status.sh
+version
 
