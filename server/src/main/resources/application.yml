@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: "jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/lbs"
-    username: "lbs"
-    password: "lsb123"
+    url: "jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_DATABASE:lbs}"
+    username: "${DB_USER:lbs}"
+    password: "${DB_PASSWORD:lsb123}"
   jpa:
     properties:
       hibernate:
@@ -20,7 +20,7 @@ banner:
   location: "classpath:/banner.txt"
 
 logging:
-  file: /lbs/log/app.log
+  file: ${LBS_LOG:/lbs/log/app.log}
   level:
     com.lbs: DEBUG
   pattern:
@@ -29,3 +29,4 @@ logging:
 
 security.secret: ${SECURITY_SECRET:random_secret_hfjdsk72euhdsbcgg6}
 telegram.token: ${TELEGRAM_TOKEN}
+
