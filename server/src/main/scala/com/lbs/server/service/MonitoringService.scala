@@ -100,18 +100,17 @@ class MonitoringService extends StrictLogging {
               + s"because this recordId is different from the next unprocessed record [$nextRecordId]"
           )
           return
-        } else {
-          nextUnprocessedRecordIds(accountId) = recordIds.filterNot(_ == nextRecordId)
         }
       case _ =>
         initializeUnprocessedRecordIds(accountId)
     }
 
     lastMonitoringTimes(accountId) = now
+    nextUnprocessedRecordIds(accountId) = nextUnprocessedRecordIds(accountId).filterNot(_ == monitoring.recordId)
 
     logger.debug(s"Looking for available terms. Monitoring [#${monitoring.recordId}]")
     if (!nextUnprocessedRecordIds(accountId).isEmpty) {
-      logger.debug(s"Monitorings to process: ${nextUnprocessedRecordIds(accountId)}")
+      logger.debug(s"Next monitorings: ${nextUnprocessedRecordIds(accountId)}")
     }
     val dateFrom = optimizeDateFrom(monitoring.dateFrom.toLocalDateTime, monitoring.offset)
     val termsEither = apiService.getAvailableTerms(
