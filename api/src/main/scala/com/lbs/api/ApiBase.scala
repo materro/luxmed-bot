@@ -18,7 +18,7 @@ trait ApiBase {
     Map(
       Host -> "portalpacjenta.luxmed.pl",
       Origin -> "https://portalpacjenta.luxmed.pl",
-      `Custom-User-Agent` -> s"PatientPortal; 4.29.0; $uuid; iOS; 17.1.1; iPhone14,5",
+      `Custom-User-Agent` -> s"PatientPortal; 4.29.1; $uuid; iOS; 17.1.1; iPhone14,5",
       `User-Agent` -> "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
       Accept -> "application/json, text/plain, */*",
       `Accept-Encoding` -> "gzip, deflate, br",
