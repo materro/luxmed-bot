@@ -74,8 +74,6 @@ package object http extends StrictLogging {
       code match {
         case HttpURLConnection.HTTP_MOVED_TEMP if httpResponse.header("Location").exists(_.contains("/LogOn")) =>
           Some(new SessionExpiredException)
-        case HttpURLConnection.HTTP_UNAUTHORIZED if lowercasedBody.contains("session has expired") =>
-          Some(new SessionExpiredException)
         case HttpURLConnection.HTTP_CONFLICT
             if lowercasedBody
               .contains("nieprawidłowy login lub hasło") || lowercasedBody.contains("invalid login or password") =>
