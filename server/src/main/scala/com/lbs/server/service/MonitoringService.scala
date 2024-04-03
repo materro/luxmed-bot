@@ -38,11 +38,11 @@ class MonitoringService extends StrictLogging {
 
   private val monitoringExecutor = new Scheduler(10)
 
-  private val MaxDelay = 60.second
+  private val MaxDelay = 30.second
 
-  private val PeriodBase = 30.second
+  private val PeriodBase = 15.second
 
-  private val PeriodMaxDelta = 60.second
+  private val PeriodMaxDelta = 30.second
 
   private val nextUnprocessedRecordIds: mutable.Map[Long, Set[Long]] = mutable.Map.empty
 
@@ -82,9 +82,11 @@ class MonitoringService extends StrictLogging {
     val lastMonitoringTime = lastMonitoringTimes.getOrElse(accountId, now - minInterval)
     val timeSinceLastMonitoring = now - lastMonitoringTime
 
+    logger.debug(s"Monitoring [#${monitoring.recordId}] for account [#${monitoring.accountId}] is executing")
+
     if (timeSinceLastMonitoring < minInterval) {
       logger.debug(
-        s"Skipping monitoring [#${monitoring.recordId}] for account [#${monitoring.accountId}] "
+        s"Skipping monitoring "
           + s"because the minimum interval ($minInterval) has not passed "
           + s"since the last monitoring ($timeSinceLastMonitoring)"
       )
@@ -96,7 +98,7 @@ class MonitoringService extends StrictLogging {
         val nextRecordId = recordIds.min
         if (monitoring.recordId != nextRecordId) {
           logger.debug(
-            s"Skipping monitoring [#${monitoring.recordId}] for account [#${monitoring.accountId}] "
+            s"Skipping monitoring "
               + s"because this recordId is different from the next unprocessed record [$nextRecordId]"
           )
           return
@@ -108,10 +110,13 @@ class MonitoringService extends StrictLogging {
     lastMonitoringTimes(accountId) = now
     nextUnprocessedRecordIds(accountId) = nextUnprocessedRecordIds(accountId).filterNot(_ == monitoring.recordId)
 
-    logger.debug(s"Looking for available terms. Monitoring [#${monitoring.recordId}]")
-    if (!nextUnprocessedRecordIds(accountId).isEmpty) {
-      logger.debug(s"Next monitorings: ${nextUnprocessedRecordIds(accountId)}")
+    logger.debug(s"Looking for available terms...")
+    if (nextUnprocessedRecordIds(accountId).isEmpty) {
+      logger.debug(s"Initializing next monitorings")
+      initializeUnprocessedRecordIds(accountId)
     }
+    logger.debug(s"Next monitorings for account [#${monitoring.accountId}]: ${nextUnprocessedRecordIds(accountId)}")
+
     val dateFrom = optimizeDateFrom(monitoring.dateFrom.toLocalDateTime, monitoring.offset)
     val termsEither = apiService.getAvailableTerms(
       monitoring.accountId,
@@ -135,7 +140,7 @@ class MonitoringService extends StrictLogging {
             notifyUserAboutTerms(terms, monitoring)
           }
         } else {
-          logger.debug(s"No new terms found for monitoring [#${monitoring.recordId}]")
+          logger.debug(s"No new terms found...")
         }
       case Left(ex: InvalidLoginOrPasswordException) =>
         logger.error(s"User entered invalid name or password. Monitoring will be disabled", ex)
