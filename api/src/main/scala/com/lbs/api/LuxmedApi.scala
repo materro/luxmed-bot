@@ -27,7 +27,7 @@ class LuxmedApi[F[_]: ThrowableMonad] extends ApiBase {
   }
 
   def loginToApp(session: Session): F[HttpResponse[Unit]] = {
-    val request = httpNewApi("Account/LogInToApp?app=search&lang=pl&client=2&paymentSupported=true", session)
+    val request = httpNewApi("Account/LogInToApp?app=search&lang=pl&client=3&blockTracing=true", session)
       .header(Authorization, session.accessToken)
     getVoid(request)
   }
