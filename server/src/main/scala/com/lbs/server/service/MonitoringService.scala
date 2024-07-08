@@ -48,9 +48,9 @@ class MonitoringService extends StrictLogging {
 
   private val lastMonitoringTimes: mutable.Map[Long, Long] = mutable.Map.empty
 
-  private val MinMonitoringIntervalDay = 130.seconds.toMillis
+  private val MinMonitoringIntervalDay = 235.seconds.toMillis
 
-  private val MinMonitoringIntervalNight = 135.seconds.toMillis
+  private val MinMonitoringIntervalNight = 205.seconds.toMillis
 
   private def delay = Random.nextInt(MaxDelay.toSeconds.toInt).seconds
 
