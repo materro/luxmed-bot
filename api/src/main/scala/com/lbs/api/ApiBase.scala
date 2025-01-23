@@ -13,13 +13,11 @@ object ApiHttp
     )
 
 trait ApiBase {
-  val uuid = java.util.UUID.randomUUID.toString.toUpperCase
+  private val uuid = java.util.UUID.randomUUID.toString.toUpperCase
   private val CommonHeaders =
     Map(
       Host -> "portalpacjenta.luxmed.pl",
       Origin -> "https://portalpacjenta.luxmed.pl",
-      `Custom-User-Agent` -> s"PatientPortal; 4.31.0; $uuid; iOS; 17.4.1; iPhone14,5",
-      `User-Agent` -> "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
       Accept -> "application/json, text/plain, */*",
       `Accept-Encoding` -> "gzip, deflate, br",
       `Accept-Language` -> "pl;q=1.0, pl;q=0.9, en;q=0.8"
@@ -27,7 +25,15 @@ trait ApiBase {
 
   private val OldApiHeaders =
     Map(
-      `X-Api-Client-Identifier` -> "iPhone"
+      `X-Api-Client-Identifier` -> "iPhone",
+      `Custom-User-Agent` -> s"PatientPortal; 4.31.0; $uuid; iOS; 17.4.1; iPhone14,5",
+      `User-Agent` -> "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
+    )
+
+  private val NewApiHeaders =
+    Map(
+      `Custom-User-Agent` -> s"PatientPortal; 4.31.0; $uuid; iOS; 17.4.1; iPhone14,5",
+      `User-Agent` -> "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
     )
 
   protected def httpUnauthorized(url: String): HttpRequest = {
@@ -44,14 +50,14 @@ trait ApiBase {
 
   protected def httpNewApi(url: String, session: Session, cookiesMaybe: Option[Seq[HttpCookie]] = None): HttpRequest = {
     val req = ApiHttp(s"https://portalpacjenta.luxmed.pl/PatientPortal/$url")
-      .headers(CommonHeaders)
-      .header(Authorization, s"Bearer ${session.jwtToken}")
+      .headers(CommonHeaders ++ NewApiHeaders)
+      .header(AuthorizationToken, s"Bearer ${session.jwtToken}")
     cookiesMaybe.map(cookies => req.cookies(cookies)).getOrElse(req.cookies(session.cookies))
   }
 
   protected def httpNewApiWithOldToken(url: String, session: Session, cookiesMaybe: Option[Seq[HttpCookie]] = None): HttpRequest = {
     val req = ApiHttp(s"https://portalpacjenta.luxmed.pl/PatientPortal/$url")
-      .headers(CommonHeaders)
+      .headers(CommonHeaders ++ NewApiHeaders)
       .header(`X-Requested-With`, "pl.luxmed.pp")
       .header(Authorization, session.accessToken)
     cookiesMaybe.map(cookies => req.cookies(cookies)).getOrElse(req.cookies(session.cookies))

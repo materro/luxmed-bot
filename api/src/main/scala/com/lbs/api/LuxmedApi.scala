@@ -16,7 +16,7 @@ class LuxmedApi[F[_]: ThrowableMonad] extends ApiBase {
   private val dateFormatNewPortal = DateTimeFormatter.ofPattern("yyyy-MM-dd")
   private val dateFormatEvents = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssZ")
 
-  def login(username: String, password: String, clientId: String = "iPhone"): F[HttpResponse[LoginResponse]] = {
+  def login(username: String, password: String, clientId: String = "Android"): F[HttpResponse[LoginResponse]] = {
     val request = httpUnauthorized("token")
       .header(`Content-Type`, "application/x-www-form-urlencoded")
       .param("client_id", clientId)
