@@ -164,7 +164,7 @@ class ApiService extends SessionSupport {
       } yield Session(accessToken, tokenType, jwtToken, joinCookies(cookies, r3.cookies))
     } catch {
       case e: Exception if attemptNumber < maxAttempts => {
-        logger.warn(s"Couldn't login from the first attempt. Trying one more time ($attemptNumber) after a short pause", e)
+        logger.warn(s"Couldn't login from ${attemptNumber + 1} attempt. Trying again after a short pause", e)
         Thread.sleep(2000)
         fullLogin(username, encryptedPassword, attemptNumber + 1)
       }
