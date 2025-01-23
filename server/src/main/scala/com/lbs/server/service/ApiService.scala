@@ -147,9 +147,10 @@ class ApiService extends SessionSupport {
     cookies.map(_.map(v => v.getName -> v).toMap).reduce(_ ++ _).values.toSeq
   }
 
-  override def fullLogin(username: String, encryptedPassword: String, secondAttempt: Boolean = false): ThrowableOr[Session] = {
+  override def fullLogin(username: String, encryptedPassword: String, attemptNumber: Int = 0): ThrowableOr[Session] = {
     val password = textEncryptor.decrypt(encryptedPassword)
     val clientId = java.util.UUID.randomUUID.toString
+    val maxAttempts = 3
     try {
       for {
         r1 <- luxmedApi.login(username, password, clientId)
@@ -162,10 +163,10 @@ class ApiService extends SessionSupport {
         jwtToken = extractAccessTokenFromReservationPage(r3.body)
       } yield Session(accessToken, tokenType, jwtToken, joinCookies(cookies, r3.cookies))
     } catch {
-      case e: Exception if !secondAttempt => {
-        logger.warn("Couldn't login from the first attempt. trying one more time after a short pause", e)
+      case e: Exception if attemptNumber < maxAttempts => {
+        logger.warn(s"Couldn't login from the first attempt. Trying one more time ($attemptNumber) after a short pause", e)
         Thread.sleep(2000)
-        fullLogin(username, encryptedPassword, secondAttempt = true)
+        fullLogin(username, encryptedPassword, attemptNumber + 1)
       }
       case e: Exception => Left(e)
     }
