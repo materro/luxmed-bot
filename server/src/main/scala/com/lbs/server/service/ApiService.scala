@@ -135,7 +135,7 @@ class ApiService extends SessionSupport {
     withSession(accountId) { session =>
       luxmedApi
         .events(session, fromDate.atZone(DateTimeUtil.Zone), toDate.atZone(DateTimeUtil.Zone))
-        .map(_.events.filter(_.status == "Reserved").sortBy(_.date))
+        .map(_.events.filter(event => event.status == "Reserved" || event.status == "Confirmed").sortBy(_.date))
     }
 
   def deleteReservation(accountId: Long, reservationId: Long): ThrowableOr[HttpResponse[String]] =
