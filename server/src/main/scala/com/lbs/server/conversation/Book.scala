@@ -164,6 +164,7 @@ class Book(
 
   private def requestTerm: Step =
     ask { bookingData =>
+      bot.sendMessage(userId.source, lang.pleaseWait)
       val availableTerms = apiService.getAvailableTerms(
         userId.accountId,
         bookingData.cityId.id,

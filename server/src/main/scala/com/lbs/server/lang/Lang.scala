@@ -62,6 +62,8 @@ trait Lang {
 
   def findTerms: String
 
+  def pleaseWait: String
+
   def modifyDate: String
 
   def moreParameters: String

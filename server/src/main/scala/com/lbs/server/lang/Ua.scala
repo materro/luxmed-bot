@@ -56,6 +56,8 @@ object Ua extends Lang {
 
   override def findTerms: String = "🔍 Знайти терміни"
 
+  override def pleaseWait: String = "✨ Будь ласка, зачекайте..."
+
   override def modifyDate: String = "📅 Змінити дату"
 
   override def bookingSummary(bookingData: Book.BookingData): String =

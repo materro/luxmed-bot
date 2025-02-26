@@ -56,6 +56,8 @@ object En extends Lang {
 
   override def findTerms: String = "🔍 Find terms"
 
+  override def pleaseWait: String = "✨ Please wait..."
+
   override def modifyDate: String = "📅 Modify date"
 
   override def bookingSummary(bookingData: Book.BookingData): String =
