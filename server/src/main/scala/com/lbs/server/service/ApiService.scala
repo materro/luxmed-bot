@@ -10,9 +10,10 @@ import org.jasypt.util.text.TextEncryptor
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
 import scalaj.http.HttpResponse
+import scala.util.Random
 
 import java.net.HttpCookie
-import java.time.{LocalDateTime, LocalTime}
+import java.time.{LocalDateTime, LocalTime, LocalDate}
 
 @Service
 class ApiService extends SessionSupport {
@@ -60,25 +61,39 @@ class ApiService extends SessionSupport {
     timeFrom: LocalTime,
     timeTo: LocalTime,
     languageId: Long = 10
-  ): ThrowableOr[List[TermExt]] =
-    withSession(accountId) { session =>
-      val termsEither = luxmedApi
-        .termsIndex(session, cityId, clinicId, serviceId, doctorId, fromDate, toDate, languageId = languageId)
-        .map(termsIndexResponse =>
-          termsIndexResponse.termsForService.termsForDays
-            .flatMap(_.terms.map(term => TermExt(termsIndexResponse.termsForService.additionalData, term)))
-        )
-      termsEither.map { terms =>
-        terms.filter { term =>
-          val time = term.term.dateTimeFrom.get.toLocalTime
-          val date = term.term.dateTimeFrom.get
-          (doctorId.isEmpty || doctorId.contains(term.term.doctor.id)) &&
-          (clinicId.isEmpty || clinicId.contains(term.term.clinicGroupId)) &&
-          (time == timeFrom || time == timeTo || (time.isAfter(timeFrom) && time.isBefore(timeTo))) &&
-          (date == fromDate || date == toDate || (date.isAfter(fromDate) && date.isBefore(toDate)))
-        }
+  ): ThrowableOr[List[TermExt]] = {
+    val searchDates = (fromDate.toLocalDate.toEpochDay to toDate.toLocalDate.toEpochDay).map { day =>
+      LocalDate.ofEpochDay(day).atStartOfDay()
+    }.toList
+
+    val responses: List[ThrowableOr[TermsForDayResponse]] = searchDates.map { date =>
+      if (fromDate != toDate) {
+        val randomDelay = Random.nextInt(1000) + 500
+        Thread.sleep(randomDelay)
+      }
+      withSession(accountId) { session =>
+        luxmedApi.oneDayTerms(session, cityId, serviceId, doctorId, date, languageId)
       }
     }
+
+    val terms = responses.flatMap {
+      case Right(response) => response.termsForDay.terms.map(
+        term => TermExt(AdditionalData(isPreparationRequired = false, List.empty), term)
+      )
+      case Left(error) => List.empty
+    }
+
+    val filteredTerms = terms.filter { term =>
+      val time = term.term.dateTimeFrom.get.toLocalTime
+      val date = term.term.dateTimeFrom.get
+      (doctorId.isEmpty || doctorId.contains(term.term.doctor.id)) &&
+      (clinicId.isEmpty || clinicId.contains(term.term.clinicGroupId)) &&
+      (time == timeFrom || time == timeTo || (time.isAfter(timeFrom) && time.isBefore(timeTo))) &&
+      (date.isEqual(fromDate) || date.isEqual(toDate) || (date.isAfter(fromDate) && date.isBefore(toDate)))
+    }
+
+    Right(filteredTerms)
+  }
 
   def reservationLockterm(
     accountId: Long,

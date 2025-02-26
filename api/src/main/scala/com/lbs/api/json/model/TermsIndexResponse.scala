@@ -142,6 +142,9 @@ case class Term(
 
 case class TermExt(additionalData: AdditionalData, term: Term) extends SerializableJsonObject
 
+case class TermsForDayResponse(correlationId: String, serviceVariantId: Long, termsForDay: TermsForDay)
+  extends SerializableJsonObject
+
 case class LuxmedFunnyDateTime(dateTimeTz: Option[ZonedDateTime] = None, dateTimeLocal: Option[LocalDateTime] = None) {
   def get: LocalDateTime = dateTimeLocal.getOrElse(dateTimeTz.map(_.toLocalDateTime).get)
 }

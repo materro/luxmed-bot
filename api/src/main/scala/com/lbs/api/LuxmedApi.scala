@@ -76,6 +76,28 @@ class LuxmedApi[F[_]: ThrowableMonad] extends ApiBase {
     get[FacilitiesAndDoctors](request).map(_.body)
   }
 
+  def oneDayTerms(
+    session: Session,
+    cityId: Long,
+    serviceId: Long,
+    doctorId: Option[Long],
+    searchDate: LocalDateTime,
+    languageId: Long = 10
+  ): F[TermsForDayResponse] = {
+    val request = httpNewApi("NewPortal/terms/oneDayTerms", session)
+      .param("searchPlace.id", cityId.toString)
+      .param("searchPlace.type", 0.toString)
+      .param("serviceVariantId", serviceId.toString)
+      .param("languageId", languageId.toString)
+      .param("searchDateFrom", dateFormatNewPortal.format(searchDate))
+      .param("searchDateTo", dateFormatNewPortal.format(searchDate))
+      .param("doctorsIds", doctorId.map(_.toString))
+      .param("searchByMedicalSpecialist", false.toString)
+      .param("delocalized", false.toString)
+
+    get[TermsForDayResponse](request).map(_.body)
+  }
+
   def termsIndex(
     session: Session,
     cityId: Long,
