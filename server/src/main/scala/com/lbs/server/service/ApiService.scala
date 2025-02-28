@@ -62,37 +62,53 @@ class ApiService extends SessionSupport {
     timeTo: LocalTime,
     languageId: Long = 10
   ): ThrowableOr[List[TermExt]] = {
-    val searchDates = (fromDate.toLocalDate.toEpochDay to toDate.toLocalDate.toEpochDay).map { day =>
-      LocalDate.ofEpochDay(day).atStartOfDay()
-    }.toList
 
-    val responses: List[ThrowableOr[TermsForDayResponse]] = searchDates.map { date =>
-      if (fromDate != toDate) {
-        val randomDelay = Random.nextInt(1000) + 500
-        Thread.sleep(randomDelay)
+    var availableDays = List[LocalDateTime]()
+
+    val termsFromIndex = withSession(accountId) { session =>
+      luxmedApi.termsIndex(session, cityId, clinicId, serviceId, doctorId, fromDate, toDate, languageId)
+        .map { response =>
+          availableDays = availableDays ++ response.termsForService.termsInfoForDays
+            .filter(_.termsStatus == 0)
+            .map(info => info.day.get)
+
+          response.termsForService.termsForDays.flatMap(
+            _.terms.map(term => TermExt(response.termsForService.additionalData, term))
+          )
+        }
+    }
+
+    termsFromIndex.flatMap { terms =>
+      if (terms.nonEmpty) {
+        Right(terms)
+      } else {
+        val oneDayResponses = availableDays.map { date =>
+          if (!fromDate.toLocalDate.isEqual(toDate.toLocalDate) && !date.toLocalDate.isEqual(fromDate.toLocalDate)) {
+            val randomDelay = Random.nextInt(500) + 500
+            Thread.sleep(randomDelay)
+          }
+          withSession(accountId) { session =>
+            luxmedApi.oneDayTerms(session, cityId, serviceId, doctorId, date, languageId)
+          }
+        }
+        val termsFromOneDay = oneDayResponses.flatMap {
+          case Right(response) => response.termsForDay.terms.map(
+            term => TermExt(AdditionalData(isPreparationRequired = false, List.empty), term)
+          )
+          case Left(_) => List.empty
+        }
+        Right(termsFromOneDay)
       }
-      withSession(accountId) { session =>
-        luxmedApi.oneDayTerms(session, cityId, serviceId, doctorId, date, languageId)
+    }.map { allTerms =>
+      allTerms.filter { term =>
+        val time = term.term.dateTimeFrom.get.toLocalTime
+        val date = term.term.dateTimeFrom.get
+        (doctorId.isEmpty || doctorId.contains(term.term.doctor.id)) &&
+        (clinicId.isEmpty || clinicId.contains(term.term.clinicGroupId)) &&
+        (time == timeFrom || time == timeTo || (time.isAfter(timeFrom) && time.isBefore(timeTo))) &&
+        (date.isEqual(fromDate) || date.isEqual(toDate) || (date.isAfter(fromDate) && date.isBefore(toDate)))
       }
     }
-
-    val terms = responses.flatMap {
-      case Right(response) => response.termsForDay.terms.map(
-        term => TermExt(AdditionalData(isPreparationRequired = false, List.empty), term)
-      )
-      case Left(error) => List.empty
-    }
-
-    val filteredTerms = terms.filter { term =>
-      val time = term.term.dateTimeFrom.get.toLocalTime
-      val date = term.term.dateTimeFrom.get
-      (doctorId.isEmpty || doctorId.contains(term.term.doctor.id)) &&
-      (clinicId.isEmpty || clinicId.contains(term.term.clinicGroupId)) &&
-      (time == timeFrom || time == timeTo || (time.isAfter(timeFrom) && time.isBefore(timeTo))) &&
-      (date.isEqual(fromDate) || date.isEqual(toDate) || (date.isAfter(fromDate) && date.isBefore(toDate)))
-    }
-
-    Right(filteredTerms)
   }
 
   def reservationLockterm(

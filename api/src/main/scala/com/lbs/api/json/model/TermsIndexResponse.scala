@@ -115,7 +115,7 @@ import java.time.{LocalDateTime, ZonedDateTime}
   */
 case class TermsIndexResponse(correlationId: String, termsForService: TermsForService) extends SerializableJsonObject
 
-case class TermsForService(additionalData: AdditionalData, termsForDays: List[TermsForDay])
+case class TermsForService(additionalData: AdditionalData, termsForDays: List[TermsForDay], termsInfoForDays: List[TermsInfoForDays])
     extends SerializableJsonObject
 
 case class PreparationItem(header: Option[String], text: Option[String])
@@ -123,6 +123,8 @@ case class PreparationItem(header: Option[String], text: Option[String])
 case class AdditionalData(isPreparationRequired: Boolean, preparationItems: List[PreparationItem])
 
 case class TermsForDay(day: LuxmedFunnyDateTime, terms: List[Term]) extends SerializableJsonObject
+
+case class TermsInfoForDays(day: LuxmedFunnyDateTime, termsStatus: Long)
 
 case class Term(
   clinic: String,
