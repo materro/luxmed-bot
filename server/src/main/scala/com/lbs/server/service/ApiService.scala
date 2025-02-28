@@ -69,7 +69,11 @@ class ApiService extends SessionSupport {
       luxmedApi.termsIndex(session, cityId, clinicId, serviceId, doctorId, fromDate, toDate, languageId)
         .map { response =>
           availableDays = availableDays ++ response.termsForService.termsInfoForDays
-            .filter(_.termsStatus == 0)
+            .filter(info =>
+              info.termsStatus == 0 &&
+              !info.day.get.isBefore(fromDate) &&
+              !info.day.get.isAfter(toDate)
+            )
             .map(info => info.day.get)
 
           response.termsForService.termsForDays.flatMap(
