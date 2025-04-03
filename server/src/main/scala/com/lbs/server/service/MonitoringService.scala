@@ -48,6 +48,10 @@ class MonitoringService extends StrictLogging {
 
   private val lastMonitoringTimes: mutable.Map[Long, Long] = mutable.Map.empty
 
+  private val activeMonitoringsCount = mutable.Map.empty[Long, Int]
+
+  private val MaxActiveMonitoringsPerUser = 3
+
   private val MinMonitoringIntervalDay = 235.seconds.toMillis
 
   private val MinMonitoringIntervalNight = 205.seconds.toMillis
@@ -82,14 +86,21 @@ class MonitoringService extends StrictLogging {
     val lastMonitoringTime = lastMonitoringTimes.getOrElse(accountId, now - minInterval)
     val timeSinceLastMonitoring = now - lastMonitoringTime
 
-    logger.debug(s"Monitoring [#${monitoring.recordId}] for account [#${monitoring.accountId}] is executing")
+    val lastMonitoringCount = activeMonitoringsCount.getOrElse(accountId, 0)
 
-    if (timeSinceLastMonitoring < minInterval) {
+    logger.debug(
+      s"Monitoring [#${monitoring.recordId}] "
+      + s"for account [#${monitoring.accountId}] "
+      + s"is executing (${lastMonitoringCount + 1}/$MaxActiveMonitoringsPerUser)")
+
+    if (lastMonitoringCount >= MaxActiveMonitoringsPerUser) {
       logger.debug(
         s"Skipping monitoring "
-          + s"because the minimum interval ($minInterval) has not passed "
-          + s"since the last monitoring ($timeSinceLastMonitoring)"
+          + s"because the maximum number of active monitorings "
+          + s"per user ($MaxActiveMonitoringsPerUser) has been reached"
       )
+      activeMonitoringsCount(accountId) = 0
+      lastMonitoringTimes(accountId) = now
       return
     }
 
@@ -107,7 +118,16 @@ class MonitoringService extends StrictLogging {
         initializeUnprocessedRecordIds(accountId)
     }
 
-    lastMonitoringTimes(accountId) = now
+    if (timeSinceLastMonitoring < minInterval) {
+      logger.debug(
+        s"Skipping monitoring "
+          + s"because the minimum interval ($minInterval) has not passed "
+          + s"since the last monitoring ($timeSinceLastMonitoring)"
+      )
+      return
+    }
+
+    activeMonitoringsCount(accountId) = lastMonitoringCount + 1
     nextUnprocessedRecordIds(accountId) = nextUnprocessedRecordIds(accountId).filterNot(_ == monitoring.recordId)
 
     logger.debug(s"Looking for available terms...")
