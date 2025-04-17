@@ -26,13 +26,13 @@ trait ApiBase {
   private val OldApiHeaders =
     Map(
       `X-Api-Client-Identifier` -> "iPhone",
-      `Custom-User-Agent` -> s"PatientPortal; 4.40.0; $uuid; iOS; 17.4.1; iPhone14,5",
+      `Custom-User-Agent` -> s"PatientPortal; 4.40.1; $uuid; iOS; 17.4.1; iPhone14,5",
       `User-Agent` -> "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
     )
 
   private val NewApiHeaders =
     Map(
-      `Custom-User-Agent` -> s"PatientPortal; 4.40.0; $uuid; iOS; 17.4.1; iPhone14,5",
+      `Custom-User-Agent` -> s"PatientPortal; 4.40.1; $uuid; iOS; 17.4.1; iPhone14,5",
       `User-Agent` -> "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
     )
 
