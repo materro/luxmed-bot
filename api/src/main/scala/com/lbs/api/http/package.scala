@@ -8,12 +8,14 @@ import com.lbs.api.json.model._
 import com.typesafe.scalalogging.StrictLogging
 import scalaj.http.{HttpRequest, HttpResponse}
 
-import java.net.{HttpCookie, HttpURLConnection}
-import scala.util.{Failure, Success, Try}
+import java.net.{HttpCookie, HttpURLConnection, Proxy, InetSocketAddress}
+import scala.util.{Failure, Success, Try, Random}
+import scala.jdk.CollectionConverters._
+import java.nio.file.{Files, Paths}
 
 package object http extends StrictLogging {
 
-  case class Session(accessToken: String, tokenType: String, jwtToken: String, cookies: Seq[HttpCookie])
+  case class Session(accessToken: String, tokenType: String, jwtToken: String, cookies: Seq[HttpCookie], proxy: Option[Proxy])
 
   object headers {
     val `Content-Type` = "Content-Type"
@@ -31,25 +33,76 @@ package object http extends StrictLogging {
     val `X-Requested-With` = "X-Requested-With"
   }
 
+  val proxyServers: List[String] = {
+    Try {
+      val path = Paths.get("proxy.txt")
+      Files.readAllLines(path).asScala.filter(_.nonEmpty).filter(_.matches(".+:\\d+")).toList
+    }.getOrElse {
+      logger.warn("Proxy list is empty. Using direct connection.")
+      List.empty[String]
+    }
+  }
+
+  def getRandomProxy(): Option[Proxy] = {
+    if (proxyServers.isEmpty) {
+      None
+    } else {
+      val choices = proxyServers :+ "direct"
+      val choice = choices(Random.nextInt(choices.length))
+      choice match {
+        case "direct" => None
+        case server =>
+          val Array(host, port) = server.split(":")
+          Some(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(host, port.toInt)))
+      }
+    }
+  }
+
   private val SensitiveHeaders = List("passw", "access_token", "refresh_token", "authorization")
 
   implicit class ExtendedHttpRequest[F[_]: ThrowableMonad](httpRequest: HttpRequest) {
-    def invoke: F[HttpResponse[String]] = {
+    def invoke(proxy: Option[Proxy]): F[HttpResponse[String]] = {
       val me = MonadError[F, Throwable]
-      logger.debug(s"Sending request:\n${hideSensitive(httpRequest)}")
-      val httpResponse = me.pure(httpRequest.asString)
-      logger.debug(s"Received response:\n${hideSensitive(httpResponse)}")
+      var attempts = 2
+      val randomDelay = Random.nextInt(4000) + 1000
+      var result: Option[HttpResponse[String]] = None
 
-      httpResponse.flatMap { response =>
-        val errorMaybe = extractLuxmedError(response)
-        errorMaybe match {
-          case Some(error) => me.raiseError(error)
-          case None =>
-            Try(response.throwError) match {
-              case Failure(error) => me.raiseError(error)
-              case Success(value) => me.pure(value)
-            }
+      while (attempts > 0 && result.isEmpty) {
+        val configuredRequest = proxy match {
+          case Some(proxy) => httpRequest.proxy(proxy)
+          case None => httpRequest
         }
+
+        logger.debug(s"Sending request:\n${hideSensitive(configuredRequest)}")
+        try {
+          val httpResponse = configuredRequest.asString
+          logger.debug(s"Received response:\n${hideSensitive(httpResponse)}")
+
+          val errorMaybe = extractLuxmedError(httpResponse)
+          errorMaybe match {
+            case Some(error) =>
+              me.raiseError(error)
+            case None =>
+              Try(httpResponse.throwError) match {
+                case Failure(error) =>
+                  logger.error(s"${proxy.getOrElse("Direct")} connection error: ${error.getMessage}")
+                  attempts -= 1
+                  Thread.sleep(randomDelay)
+                case Success(value) =>
+                  result = Some(value)
+              }
+          }
+        } catch {
+          case e: Exception =>
+            logger.error(s"Proxy connection is invalid: $proxy - ${e.getMessage}")
+            attempts -= 1
+            Thread.sleep(randomDelay)
+        }
+      }
+
+      result match {
+        case Some(response) => me.pure(response)
+        case None => me.raiseError(new Exception(s"Failed to connect after multiple attempts"))
       }
     }
 
@@ -95,6 +148,12 @@ package object http extends StrictLogging {
     private def hideSensitive(httpRequest: HttpRequest) = {
       httpRequest.copy(params = httpRequest.params.map { case (k, v) =>
         if (hide(k)) k -> "******" else k -> v
+      })
+    }
+
+    private def hideSensitive(httpResponse: HttpResponse[String]): HttpResponse[String] = {
+      httpResponse.copy(headers = httpResponse.headers.map { case (k, v) =>
+        if (hide(k)) k -> IndexedSeq("******") else k -> v
       })
     }
 

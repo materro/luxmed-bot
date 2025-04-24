@@ -186,17 +186,19 @@ class ApiService extends SessionSupport {
     val password = textEncryptor.decrypt(encryptedPassword)
     val clientId = java.util.UUID.randomUUID.toString
     val maxAttempts = 5
+    val proxy = com.lbs.api.http.getRandomProxy()
+    logger.info(s"Attempting to login using proxy: $proxy")
     try {
       for {
-        r1 <- luxmedApi.login(username, password, clientId)
-        tmpSession = Session(r1.body.accessToken, r1.body.accessToken, "", r1.cookies)
+        r1 <- luxmedApi.login(username, password, clientId, proxy)
+        tmpSession = Session(r1.body.accessToken, r1.body.accessToken, "", r1.cookies, proxy)
         r2 <- luxmedApi.loginToApp(tmpSession)
         cookies = joinCookies(r1.cookies, r2.cookies, Seq(new HttpCookie("GlobalLang", "pl")))
         accessToken = r1.body.accessToken
         tokenType = r1.body.tokenType
         r3 <- luxmedApi.getReservationPage(tmpSession, cookies)
         jwtToken = extractAccessTokenFromReservationPage(r3.body)
-      } yield Session(accessToken, tokenType, jwtToken, joinCookies(cookies, r3.cookies))
+      } yield Session(accessToken, tokenType, jwtToken, joinCookies(cookies, r3.cookies), proxy)
     } catch {
       case e: Exception if attemptNumber < maxAttempts => {
         logger.warn(s"Couldn't login from ${attemptNumber + 1} attempt. Trying again after a short pause", e)
