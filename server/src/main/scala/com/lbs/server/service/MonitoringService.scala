@@ -189,8 +189,8 @@ class MonitoringService extends StrictLogging {
           s"Scheduled monitoring: [#${monitoring.recordId}] with delay: $delaySnapshot and period: $periodSnapshot"
         )
         activeMonitorings += (monitoring.recordId -> (monitoring -> future))
+        index += 1
       }
-      index += 1
     }
     initializeUnprocessedRecordIds()
     logger.debug(s"Number of active monitorings: ${activeMonitorings.size}")
