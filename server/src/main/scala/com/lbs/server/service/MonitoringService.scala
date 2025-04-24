@@ -42,7 +42,7 @@ class MonitoringService extends StrictLogging {
 
   private val PeriodBase = 3.seconds
 
-  private val PeriodMaxDelta = 9.seconds
+  private val PeriodMaxDelta = 3.seconds
 
   private val nextUnprocessedRecordIds: mutable.Map[Long, Set[Long]] = mutable.Map.empty
 
