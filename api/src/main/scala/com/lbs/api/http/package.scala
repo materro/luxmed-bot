@@ -63,50 +63,38 @@ package object http extends StrictLogging {
   implicit class ExtendedHttpRequest[F[_]: ThrowableMonad](httpRequest: HttpRequest) {
     def invoke(proxy: Option[Proxy]): F[HttpResponse[String]] = {
       val me = MonadError[F, Throwable]
-      var attempts = 1
-      val randomDelay = Random.nextInt(4000) + 1000
       var result: Option[HttpResponse[String]] = None
 
-      while (attempts > 0 && result.isEmpty) {
-        val configuredRequest = proxy match {
-          case Some(proxy) => httpRequest.proxy(proxy)
-          case None => httpRequest
-        }
+      val configuredRequest = proxy match {
+        case Some(proxy) => httpRequest.proxy(proxy)
+        case None => httpRequest
+      }
 
-        logger.debug(s"Sending request:\n${hideSensitive(configuredRequest)}")
-        try {
-          val httpResponse = configuredRequest.asString
-          logger.debug(s"Received response:\n${hideSensitive(httpResponse)}")
+      logger.debug(s"Sending request:\n${hideSensitive(configuredRequest)}")
+      try {
+        val httpResponse = configuredRequest.asString
+        logger.debug(s"Received response:\n${hideSensitive(httpResponse)}")
 
-          val errorMaybe = extractLuxmedError(httpResponse)
-          errorMaybe match {
-            case Some(error) =>
-              me.raiseError(error)
-            case None =>
-              Try(httpResponse.throwError) match {
-                case Failure(error) =>
-                  logger.error(s"${proxy.getOrElse("Direct")} connection error: ${error.getMessage}")
-                  attempts -= 1
-                  if (attempts > 0) {
-                    Thread.sleep(randomDelay)
-                  }
-                case Success(value) =>
-                  result = Some(value)
-              }
-          }
-        } catch {
-          case e: Exception =>
-            logger.error(s"Proxy connection is invalid: $proxy - ${e.getMessage}")
-            attempts -= 1
-            if (attempts > 0) {
-              Thread.sleep(randomDelay)
+        val errorMaybe = extractLuxmedError(httpResponse)
+        errorMaybe match {
+          case Some(error) =>
+            me.raiseError(error)
+          case None =>
+            Try(httpResponse.throwError) match {
+              case Failure(error) =>
+                logger.error(s"${proxy.getOrElse("Direct")} connection error: ${error.getMessage}")
+              case Success(value) =>
+                result = Some(value)
             }
         }
+      } catch {
+        case e: Exception =>
+          logger.error(s"${proxy.getOrElse("Direct")} connection is invalid: ${e.getMessage}")
       }
 
       result match {
         case Some(response) => me.pure(response)
-        case None => me.raiseError(new Exception(s"Failed to connect"))
+        case None => me.raiseError(new Exception(s"Failed to connect using ${proxy.getOrElse("direct")}"))
       }
     }
 
