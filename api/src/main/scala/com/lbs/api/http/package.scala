@@ -63,7 +63,7 @@ package object http extends StrictLogging {
   implicit class ExtendedHttpRequest[F[_]: ThrowableMonad](httpRequest: HttpRequest) {
     def invoke(proxy: Option[Proxy]): F[HttpResponse[String]] = {
       val me = MonadError[F, Throwable]
-      var attempts = 2
+      var attempts = 1
       val randomDelay = Random.nextInt(4000) + 1000
       var result: Option[HttpResponse[String]] = None
 
@@ -87,7 +87,9 @@ package object http extends StrictLogging {
                 case Failure(error) =>
                   logger.error(s"${proxy.getOrElse("Direct")} connection error: ${error.getMessage}")
                   attempts -= 1
-                  Thread.sleep(randomDelay)
+                  if (attempts > 0) {
+                    Thread.sleep(randomDelay)
+                  }
                 case Success(value) =>
                   result = Some(value)
               }
@@ -96,13 +98,15 @@ package object http extends StrictLogging {
           case e: Exception =>
             logger.error(s"Proxy connection is invalid: $proxy - ${e.getMessage}")
             attempts -= 1
-            Thread.sleep(randomDelay)
+            if (attempts > 0) {
+              Thread.sleep(randomDelay)
+            }
         }
       }
 
       result match {
         case Some(response) => me.pure(response)
-        case None => me.raiseError(new Exception(s"Failed to connect after multiple attempts"))
+        case None => me.raiseError(new Exception(s"Failed to connect"))
       }
     }
 
