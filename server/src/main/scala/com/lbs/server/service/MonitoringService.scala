@@ -38,11 +38,11 @@ class MonitoringService extends StrictLogging {
 
   private val monitoringExecutor = new Scheduler(10)
 
-  private val MaxDelay = 30.seconds
+  private val MaxDelay = 20.seconds
 
-  private val PeriodBase = 3.seconds
+  private val PeriodBase = 10.seconds
 
-  private val PeriodMaxDelta = 3.seconds
+  private val PeriodMaxDelta = 10.seconds
 
   private val nextUnprocessedRecordIds: mutable.Map[Long, Set[Long]] = mutable.Map.empty
 
@@ -50,11 +50,11 @@ class MonitoringService extends StrictLogging {
 
   private val activeMonitoringsCount = mutable.Map.empty[Long, Int]
 
-  private val MaxActiveMonitoringsPerUser = 4
+  private val MaxActiveMonitoringsPerUser = 2
 
   private val MinMonitoringIntervalDay = 185.seconds.toMillis
 
-  private val MinMonitoringIntervalNight = 185.seconds.toMillis
+  private val MinMonitoringIntervalNight = 195.seconds.toMillis
 
   private def delay = Random.nextInt(MaxDelay.toSeconds.toInt).seconds
 
