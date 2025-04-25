@@ -14,7 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
 
 import java.time.{LocalDateTime, ZonedDateTime}
-import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.{ConcurrentHashMap, ScheduledFuture}
 import javax.annotation.PostConstruct
 import scala.collection.mutable
 import scala.concurrent.duration._
@@ -32,7 +32,7 @@ class MonitoringService extends StrictLogging {
   @Autowired
   private var localization: Localization = _
 
-  private var activeMonitorings = mutable.Map.empty[JLong, (Monitoring, ScheduledFuture[_])]
+  private var activeMonitorings = new ConcurrentHashMap[JLong, (Monitoring, ScheduledFuture[_])]
 
   private val dbChecker = new Scheduler(1)
 
@@ -44,11 +44,11 @@ class MonitoringService extends StrictLogging {
 
   private val PeriodMaxDelta = 10.seconds
 
-  private val nextUnprocessedRecordIds: mutable.Map[Long, Set[Long]] = mutable.Map.empty
+  private val nextUnprocessedRecordIds: new ConcurrentHashMap[Long, mutable.Set[Long]]
 
-  private val lastMonitoringTimes: mutable.Map[Long, Long] = mutable.Map.empty
+  private val lastMonitoringTimes: new ConcurrentHashMap[Long, Long]
 
-  private val activeMonitoringsCount = mutable.Map.empty[Long, Int]
+  private val activeMonitoringsCount = new ConcurrentHashMap[Long, Int]
 
   private val MaxActiveMonitoringsPerUser = 2
 
@@ -104,7 +104,8 @@ class MonitoringService extends StrictLogging {
       return
     }
 
-    nextUnprocessedRecordIds.get(accountId) match {
+    val recordIds = nextUnprocessedRecordIds.getOrElse(accountId, mutable.Set.empty)
+    if (recordIds.nonEmpty) {
       case Some(recordIds) if recordIds.nonEmpty =>
         val nextRecordId = recordIds.min
         if (monitoring.recordId != nextRecordId) {
@@ -114,8 +115,8 @@ class MonitoringService extends StrictLogging {
           )
           return
         }
-      case _ =>
-        initializeUnprocessedRecordIds(accountId)
+    } else {
+      initializeUnprocessedRecordIds(accountId)
     }
 
     if (timeSinceLastMonitoring < minInterval) {
@@ -127,15 +128,15 @@ class MonitoringService extends StrictLogging {
       return
     }
 
-    activeMonitoringsCount(accountId) = lastMonitoringCount + 1
-    nextUnprocessedRecordIds(accountId) = nextUnprocessedRecordIds(accountId).filterNot(_ == monitoring.recordId)
+    activeMonitoringsCount.put(accountId, lastMonitoringCount + 1)
+    nextUnprocessedRecordIds.get(accountId).foreach(_.remove(monitoring.recordId))
 
     logger.debug(s"Looking for available terms...")
-    if (nextUnprocessedRecordIds(accountId).isEmpty) {
+    if (nextUnprocessedRecordIds.get(accountId).forall(_.isEmpty)) {
       logger.debug(s"Initializing next monitorings")
       initializeUnprocessedRecordIds(accountId)
     }
-    logger.debug(s"Next monitorings for account [#${monitoring.accountId}]: ${nextUnprocessedRecordIds(accountId)}")
+    logger.debug(s"Next monitorings for account [#${monitoring.accountId}]: ${nextUnprocessedRecordIds.get(accountId)}")
 
     val dateFrom = optimizeDateFrom(monitoring.dateFrom.toLocalDateTime, monitoring.offset)
     val termsEither = apiService.getAvailableTerms(
@@ -179,17 +180,15 @@ class MonitoringService extends StrictLogging {
   }
 
   private def initializeMonitorings(allMonitorings: Seq[Monitoring]): Unit = {
-    var index = 0
     allMonitorings.foreach { monitoring =>
       if (monitoring.active && !activeMonitorings.contains(monitoring.recordId)) {
-        val delaySnapshot = delay * index
+        val delaySnapshot = delay
         val periodSnapshot = period
         val future = monitoringExecutor.schedule(monitor(monitoring), delaySnapshot, periodSnapshot)
         logger.debug(
           s"Scheduled monitoring: [#${monitoring.recordId}] with delay: $delaySnapshot and period: $periodSnapshot"
         )
-        activeMonitorings += (monitoring.recordId -> (monitoring -> future))
-        index += 1
+        activeMonitorings.put(monitoring.recordId, (monitoring, future))
       }
     }
     initializeUnprocessedRecordIds()
@@ -197,12 +196,11 @@ class MonitoringService extends StrictLogging {
   }
 
   private def initializeUnprocessedRecordIds(accountId: Option[Long] = None): Unit = {
-    activeMonitorings.foreach {
-      case (_, (monitoring, _)) =>
-        if (accountId.isEmpty || accountId.contains(monitoring.accountId)) {
-          nextUnprocessedRecordIds(monitoring.accountId) =
-            nextUnprocessedRecordIds.getOrElse(monitoring.accountId, Set()) + monitoring.recordId
-        }
+    activeMonitorings.forEach { (recordId, (monitoring, _)) =>
+      if (accountId.isEmpty || accountId.contains(monitoring.accountId)) {
+        val set = nextUnprocessedRecordIds.getOrElseUpdate(monitoring.accountId, mutable.Set.empty)
+        set.add(recordId)
+      }
     }
   }
 
@@ -222,12 +220,13 @@ class MonitoringService extends StrictLogging {
 
   private def disableOutdated(): Unit = {
     val now = ZonedDateTime.now()
-    val toDisable = activeMonitorings.collect {
-      case (id, (monitoring, _)) if monitoring.dateTo.isBefore(now) =>
-        id -> monitoring
-    }
+    val toDisable = activeMonitorings.entrySet().stream()
+      .filter(entry => entry.getValue._1.dateTo.isBefore(now))
+      .map(entry => entry.getKey -> entry.getValue._1)
+      .toArray[(JLong, Monitoring)]
 
     toDisable.foreach { case (id, monitoring) =>
+      id -> monitoring
       logger.debug(s"Monitoring [#$id] is going to be disable as outdated")
       notifyChatAboutDisabledMonitoring(monitoring)
       deactivateMonitoring(monitoring.accountId, id)
@@ -303,7 +302,7 @@ class MonitoringService extends StrictLogging {
 
   def deactivateMonitoring(accountId: JLong, monitoringId: JLong): Unit = {
     val activeMonitoringMaybe = activeMonitorings.remove(monitoringId)
-    nextUnprocessedRecordIds(accountId) = nextUnprocessedRecordIds(accountId).filterNot(_ == monitoringId)
+    nextUnprocessedRecordIds.get(accountId).foreach(_.remove(monitoringId))
 
     activeMonitoringMaybe match {
       case Some((monitoring, future)) =>
