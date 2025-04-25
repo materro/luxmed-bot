@@ -36,7 +36,7 @@ package object http extends StrictLogging {
   val proxyServers: List[String] = {
     Try {
       val path = Paths.get("proxy.txt")
-      Files.readAllLines(path).asScala.filter(_.nonEmpty).filter(_.matches(".+:\\d+")).toList
+      Files.readAllLines(path).asScala.filter(_.nonEmpty).filter(_.matches("[^#].+:\\d+")).toList
     }.getOrElse {
       logger.warn("Proxy list is empty. Using direct connection.")
       List.empty[String]
@@ -63,7 +63,6 @@ package object http extends StrictLogging {
   implicit class ExtendedHttpRequest[F[_]: ThrowableMonad](httpRequest: HttpRequest) {
     def invoke(proxy: Option[Proxy]): F[HttpResponse[String]] = {
       val me = MonadError[F, Throwable]
-      var result: Option[HttpResponse[String]] = None
 
       val configuredRequest = proxy match {
         case Some(proxy) => httpRequest.proxy(proxy)
@@ -71,30 +70,21 @@ package object http extends StrictLogging {
       }
 
       logger.debug(s"Sending request:\n${hideSensitive(configuredRequest)}")
-      try {
-        val httpResponse = configuredRequest.asString
-        logger.debug(s"Received response:\n${hideSensitive(httpResponse)}")
 
-        val errorMaybe = extractLuxmedError(httpResponse)
-        errorMaybe match {
-          case Some(error) =>
-            me.raiseError(error)
+      me.handleErrorWith(me.pure(configuredRequest.asString)) { e =>
+        logger.error(s"Request error: ${e.getMessage}")
+        me.raiseError(new Exception(s"Failed to connect using ${proxy.getOrElse("direct")} connection."))
+      }.flatMap { response =>
+        logger.debug(s"Received response:\n${hideSensitive(response)}")
+
+        extractLuxmedError(response) match {
+          case Some(error) => me.raiseError(error)
           case None =>
-            Try(httpResponse.throwError) match {
-              case Failure(error) =>
-                logger.error(s"${proxy.getOrElse("Direct")} connection error: ${error.getMessage}")
-              case Success(value) =>
-                result = Some(value)
+            Try(response.throwError) match {
+              case Failure(error) => me.raiseError(error)
+              case Success(value) => me.pure(value)
             }
         }
-      } catch {
-        case e: Exception =>
-          logger.error(s"${proxy.getOrElse("Direct")} connection is invalid: ${e.getMessage}")
-      }
-
-      result match {
-        case Some(response) => me.pure(response)
-        case None => me.raiseError(new Exception(s"Failed to connect using ${proxy.getOrElse("direct")}"))
       }
     }
 
@@ -115,15 +105,17 @@ package object http extends StrictLogging {
 
     private def extractLuxmedError(httpResponse: HttpResponse[String]) = {
       val body = httpResponse.body
-      val lowercasedBody = body.toLowerCase
       val code = httpResponse.code
       code match {
         case HttpURLConnection.HTTP_MOVED_TEMP if httpResponse.header("Location").exists(url => url.contains("/LogOn") || url.contains("/UniversalLink")) =>
           Some(new SessionExpiredException)
-        case HttpURLConnection.HTTP_CONFLICT
-            if lowercasedBody
-              .contains("nieprawidłowy login lub hasło") || lowercasedBody.contains("invalid login or password") =>
-          Some(new InvalidLoginOrPasswordException)
+        case HttpURLConnection.HTTP_CONFLICT => {
+          val lowercasedBody = body.toLowerCase
+          if (lowercasedBody.contains("nieprawidłowy login lub hasło") || lowercasedBody.contains("invalid login or password"))
+            Some(new InvalidLoginOrPasswordException)
+          else
+            None
+        }
         case _ if code >=  HttpURLConnection.HTTP_BAD_REQUEST =>
           Try(body.as[LuxmedErrorsList])
             .orElse(Try(body.as[LuxmedErrorsMap]))
