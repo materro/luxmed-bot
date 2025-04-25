@@ -46,9 +46,9 @@ class MonitoringService extends StrictLogging {
 
   private val TimeOffsetBase = 3.seconds
 
-  private val MaxDelay = 30.seconds
+  private val MaxDelay = 60.seconds
 
-  private val PeriodMaxDelta = 10.seconds
+  private val PeriodMaxDelta = 20.seconds
 
   private val MaxActiveMonitoringsPerUser = 2
 
@@ -83,10 +83,10 @@ class MonitoringService extends StrictLogging {
     val isNightTime = currentHour < 6 || currentHour > 22
     val minInterval = if (isNightTime) MinMonitoringIntervalNight else MinMonitoringIntervalDay
 
-    val lastMonitoringTime = lastMonitoringTimes.getOrElse(accountId, now - minInterval)
+    val lastMonitoringTime: Long = Option(lastMonitoringTimes.get(accountId)).getOrElse(now - minInterval)
     val timeSinceLastMonitoring = now - lastMonitoringTime
 
-    val lastMonitoringCount = activeMonitoringsCount.getOrElse(accountId, 0)
+    val lastMonitoringCount: Int = Option(activeMonitoringsCount.get(accountId)).getOrElse(0)
 
     logger.debug(
       s"Monitoring [#${monitoring.recordId}] "
@@ -99,22 +99,20 @@ class MonitoringService extends StrictLogging {
           + s"because the maximum number of active monitorings "
           + s"per user ($MaxActiveMonitoringsPerUser) has been reached"
       )
-      activeMonitoringsCount(accountId) = 0
-      lastMonitoringTimes(accountId) = now
+      activeMonitoringsCount.put(accountId, 0)
+      lastMonitoringTimes.put(accountId, now)
       return
     }
 
-    val recordIds = nextUnprocessedRecordIds.getOrElse(accountId, mutable.Set.empty)
+    val recordIds: mutable.Set[Long] = Option(nextUnprocessedRecordIds.get(accountId)).getOrElse(mutable.Set.empty)
     if (recordIds.nonEmpty) {
-      case Some(recordIds) if recordIds.nonEmpty =>
-        val nextRecordId = recordIds.min
-        if (monitoring.recordId != nextRecordId) {
-          logger.debug(
-            s"Skipping monitoring "
-              + s"because this recordId is different from the next unprocessed record [$nextRecordId]"
-          )
-          return
-        }
+      val nextRecordId = recordIds.min
+      if (monitoring.recordId != nextRecordId) {
+        logger.debug(
+          s"Skipping monitoring because this recordId is different from the next unprocessed record [$nextRecordId]"
+        )
+        return
+      }
     } else {
       initializeUnprocessedRecordIds(accountId)
     }
@@ -129,7 +127,7 @@ class MonitoringService extends StrictLogging {
     }
 
     activeMonitoringsCount.put(accountId, lastMonitoringCount + 1)
-    nextUnprocessedRecordIds.get(accountId).foreach(_.remove(monitoring.recordId))
+    Option(nextUnprocessedRecordIds.get(accountId)).foreach(_.remove(monitoring.recordId))
 
     logger.debug(s"Looking for available terms...")
     if (Option(nextUnprocessedRecordIds.get(accountId)).forall(_.isEmpty)) {
@@ -184,7 +182,7 @@ class MonitoringService extends StrictLogging {
     allMonitorings.foreach { monitoring =>
       if (monitoring.active && !activeMonitorings.contains(monitoring.recordId)) {
         delayIndex += TimeOffsetBase.toSeconds.toInt
-        val delaySnapshot = delayIndex + delay
+        val delaySnapshot = (delayIndex + delay.toSeconds).seconds
         val periodSnapshot = period
         val future = monitoringExecutor.schedule(monitor(monitoring), delaySnapshot, periodSnapshot)
         logger.debug(
@@ -198,10 +196,10 @@ class MonitoringService extends StrictLogging {
   }
 
   private def initializeUnprocessedRecordIds(accountId: Option[Long] = None): Unit = {
-    activeMonitorings.forEach { (recordId, (monitoring, _)) =>
-      if (accountId.isEmpty || accountId.contains(monitoring.accountId)) {
-        val set = nextUnprocessedRecordIds.getOrElseUpdate(monitoring.accountId, mutable.Set.empty)
-        set.add(recordId)
+    activeMonitorings.forEach { (key: JLong, value: (Monitoring, ScheduledFuture[_])) =>
+      if (accountId.isEmpty || accountId.contains(value._1.accountId)) {
+        val set = nextUnprocessedRecordIds.computeIfAbsent(key, _ => mutable.Set.empty[Long])
+        set.add(key)
       }
     }
   }
@@ -225,7 +223,7 @@ class MonitoringService extends StrictLogging {
     val toDisable = activeMonitorings.entrySet().stream()
       .filter(entry => entry.getValue._1.dateTo.isBefore(now))
       .map(entry => entry.getKey -> entry.getValue._1)
-      .toArray[(JLong, Monitoring)]
+      .toArray(size => new Array[(JLong, Monitoring)](size))
 
     toDisable.foreach { case (id, monitoring) =>
       logger.debug(s"Monitoring [#$id] is going to be disable as outdated")
@@ -302,8 +300,8 @@ class MonitoringService extends StrictLogging {
   }
 
   def deactivateMonitoring(accountId: JLong, monitoringId: JLong): Unit = {
-    val activeMonitoringMaybe = activeMonitorings.remove(monitoringId)
-    nextUnprocessedRecordIds.get(accountId).foreach(_.remove(monitoringId))
+    val activeMonitoringMaybe = Option(activeMonitorings.remove(monitoringId))
+    Option(nextUnprocessedRecordIds.get(accountId)).foreach(_.remove(monitoringId))
 
     activeMonitoringMaybe match {
       case Some((monitoring, future)) =>
