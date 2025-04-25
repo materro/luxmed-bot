@@ -197,8 +197,9 @@ class MonitoringService extends StrictLogging {
 
   private def initializeUnprocessedRecordIds(accountId: Option[Long] = None): Unit = {
     activeMonitorings.forEach { (key: JLong, value: (Monitoring, ScheduledFuture[_])) =>
-      if (accountId.isEmpty || accountId.contains(value._1.accountId)) {
-        val set = nextUnprocessedRecordIds.computeIfAbsent(key, _ => mutable.Set.empty[Long])
+      val monitoring = value._1
+      if (accountId.isEmpty || accountId.contains(monitoring.accountId)) {
+        val set = nextUnprocessedRecordIds.computeIfAbsent(monitoring.accountId, _ => mutable.Set.empty[Long])
         set.add(key)
       }
     }
