@@ -34,21 +34,21 @@ class MonitoringService extends StrictLogging {
 
   private var activeMonitorings = new ConcurrentHashMap[JLong, (Monitoring, ScheduledFuture[_])]
 
+  private val nextUnprocessedRecordIds = new ConcurrentHashMap[Long, mutable.Set[Long]]
+
+  private val lastMonitoringTimes = new ConcurrentHashMap[Long, Long]
+
+  private val activeMonitoringsCount = new ConcurrentHashMap[Long, Int]
+
   private val dbChecker = new Scheduler(1)
 
   private val monitoringExecutor = new Scheduler(10)
 
-  private val MaxDelay = 20.seconds
+  private val TimeOffsetBase = 3.seconds
 
-  private val PeriodBase = 10.seconds
+  private val MaxDelay = 30.seconds
 
   private val PeriodMaxDelta = 10.seconds
-
-  private val nextUnprocessedRecordIds: new ConcurrentHashMap[Long, mutable.Set[Long]]
-
-  private val lastMonitoringTimes: new ConcurrentHashMap[Long, Long]
-
-  private val activeMonitoringsCount = new ConcurrentHashMap[Long, Int]
 
   private val MaxActiveMonitoringsPerUser = 2
 
@@ -58,7 +58,7 @@ class MonitoringService extends StrictLogging {
 
   private def delay = Random.nextInt(MaxDelay.toSeconds.toInt).seconds
 
-  private def period = (PeriodBase.toSeconds + Random.nextInt(PeriodMaxDelta.toSeconds.toInt)).seconds
+  private def period = (TimeOffsetBase.toSeconds + Random.nextInt(PeriodMaxDelta.toSeconds.toInt)).seconds
 
   private var checkedOn: ZonedDateTime = _
 
@@ -132,7 +132,7 @@ class MonitoringService extends StrictLogging {
     nextUnprocessedRecordIds.get(accountId).foreach(_.remove(monitoring.recordId))
 
     logger.debug(s"Looking for available terms...")
-    if (nextUnprocessedRecordIds.get(accountId).forall(_.isEmpty)) {
+    if (Option(nextUnprocessedRecordIds.get(accountId)).forall(_.isEmpty)) {
       logger.debug(s"Initializing next monitorings")
       initializeUnprocessedRecordIds(accountId)
     }
@@ -180,9 +180,11 @@ class MonitoringService extends StrictLogging {
   }
 
   private def initializeMonitorings(allMonitorings: Seq[Monitoring]): Unit = {
+    var delayIndex = 0
     allMonitorings.foreach { monitoring =>
       if (monitoring.active && !activeMonitorings.contains(monitoring.recordId)) {
-        val delaySnapshot = delay
+        delayIndex += TimeOffsetBase.toSeconds.toInt
+        val delaySnapshot = delayIndex + delay
         val periodSnapshot = period
         val future = monitoringExecutor.schedule(monitor(monitoring), delaySnapshot, periodSnapshot)
         logger.debug(
@@ -226,7 +228,6 @@ class MonitoringService extends StrictLogging {
       .toArray[(JLong, Monitoring)]
 
     toDisable.foreach { case (id, monitoring) =>
-      id -> monitoring
       logger.debug(s"Monitoring [#$id] is going to be disable as outdated")
       notifyChatAboutDisabledMonitoring(monitoring)
       deactivateMonitoring(monitoring.accountId, id)
