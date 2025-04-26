@@ -46,11 +46,11 @@ class MonitoringService extends StrictLogging {
 
   private val TimeOffsetBase = 3.seconds
 
-  private val MaxDelay = 30.seconds
+  private val MaxDelay = 1.seconds
 
   private val PeriodMaxDelta = 20.seconds
 
-  private val MaxActiveMonitoringsPerUser = 2
+  private val MaxActiveMonitoringsPerUser = 3
 
   private val MinMonitoringIntervalDay = 185.seconds.toMillis
 
