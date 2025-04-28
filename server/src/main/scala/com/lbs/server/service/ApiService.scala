@@ -185,7 +185,7 @@ class ApiService extends SessionSupport {
   override def fullLogin(username: String, encryptedPassword: String, attemptNumber: Int = 0): ThrowableOr[Session] = {
     val password = textEncryptor.decrypt(encryptedPassword)
     val clientId = java.util.UUID.randomUUID.toString
-    val maxAttempts = 5
+    val maxAttempts = 2
     val proxy = com.lbs.api.http.getRandomProxy()
     logger.info(s"Attempting to login using proxy: $proxy")
     try {
@@ -202,7 +202,7 @@ class ApiService extends SessionSupport {
     } catch {
       case e: Exception if attemptNumber < maxAttempts => {
         logger.warn(s"Couldn't login from ${attemptNumber + 1} attempt. Trying again after a short pause", e)
-        val randomDelay = Random.nextInt(1000) + 500
+        val randomDelay = Random.nextInt(1000) + 2000
         Thread.sleep(randomDelay)
         fullLogin(username, encryptedPassword, attemptNumber + 1)
       }

@@ -50,11 +50,11 @@ class MonitoringService extends StrictLogging {
 
   private val PeriodMaxDelta = 20.seconds
 
-  private val MaxActiveMonitoringsPerUser = 3
+  private val MaxActiveMonitoringsPerUser = 2
 
-  private val MinMonitoringIntervalDay = 185.seconds.toMillis
+  private val MinMonitoringIntervalDay = 205.seconds.toMillis
 
-  private val MinMonitoringIntervalNight = 195.seconds.toMillis
+  private val MinMonitoringIntervalNight = 200.seconds.toMillis
 
   private def delay = Random.nextInt(MaxDelay.toSeconds.toInt).seconds
 
