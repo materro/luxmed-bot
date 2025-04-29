@@ -15,7 +15,7 @@ import java.nio.file.{Files, Paths}
 
 package object http extends StrictLogging {
 
-  case class Session(accessToken: String, tokenType: String, jwtToken: String, cookies: Seq[HttpCookie], proxy: Option[Proxy])
+  case class Session(accessToken: String, tokenType: String, jwtToken: String, cookies: Seq[HttpCookie])
 
   object headers {
     val `Content-Type` = "Content-Type"

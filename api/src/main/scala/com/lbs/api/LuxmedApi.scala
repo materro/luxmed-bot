@@ -16,29 +16,38 @@ class LuxmedApi[F[_]: ThrowableMonad] extends ApiBase {
   private val dateFormatNewPortal = DateTimeFormatter.ofPattern("yyyy-MM-dd")
   private val dateFormatEvents = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssZ")
 
-  def login(username: String, password: String, clientId: String = "iPhone", proxy: Option[Proxy]): F[HttpResponse[LoginResponse]] = {
+  private var currentProxy: Option[Proxy] = None
+  def setProxy(proxy: Option[Proxy] = com.lbs.api.http.getRandomProxy()): Unit = {
+    currentProxy = proxy
+  }
+
+  def getProxy(): Option[Proxy] = {
+    currentProxy
+  }
+
+  def login(username: String, password: String, clientId: String = "iPhone"): F[HttpResponse[LoginResponse]] = {
     val request = httpUnauthorized("token")
       .header(`Content-Type`, "application/x-www-form-urlencoded")
       .param("client_id", clientId)
       .param("grant_type", "password")
       .param("password", password)
       .param("username", username)
-    post[LoginResponse](request, proxy = proxy)
+    post[LoginResponse](request)
   }
 
   def loginToApp(session: Session): F[HttpResponse[Unit]] = {
     val request = httpNewApiWithOldToken("Account/LogInToApp?app=search&client=3&lang=pl&blockTracing=true", session)
-    getVoid(request, session.proxy)
+    getVoid(request)
   }
 
   def getForgeryToken(session: Session): F[HttpResponse[ForgeryTokenResponse]] = {
     val request = httpNewApi("security/getforgerytoken", session)
-    get[ForgeryTokenResponse](request, session.proxy)
+    get[ForgeryTokenResponse](request)
   }
 
   def getReservationPage(session: Session, cookies: Seq[HttpCookie]): F[HttpResponse[String]] = {
     val request = httpNewApiWithOldToken("NewPortal/Page/Reservation", session, Some(cookies))
-    getString(request, session.proxy)
+    getString(request)
   }
 
   def events(
@@ -50,18 +59,18 @@ class LuxmedApi[F[_]: ThrowableMonad] extends ApiBase {
       .header(`Content-Type`, "application/json")
       .param("filter.filterDateFrom", dateFormatEvents.format(fromDate))
       .param("filter.filterDateTo", dateFormatEvents.format(toDate))
-    get[EventsResponse](request, session.proxy).map(_.body)
+    get[EventsResponse](request).map(_.body)
   }
 
   def dictionaryCities(session: Session): F[List[DictionaryCity]] = {
     val request = httpNewApi("NewPortal/Dictionary/cities", session).header(`Content-Type`, "application/json")
-    getList[DictionaryCity](request, session.proxy).map(_.body)
+    getList[DictionaryCity](request).map(_.body)
   }
 
   def dictionaryServiceVariants(session: Session): F[List[DictionaryServiceVariants]] = {
     val request =
       httpNewApi("NewPortal/Dictionary/serviceVariantsGroups", session).header(`Content-Type`, "application/json")
-    getList[DictionaryServiceVariants](request, session.proxy).map(_.body)
+    getList[DictionaryServiceVariants](request).map(_.body)
   }
 
   def dictionaryFacilitiesAndDoctors(
@@ -73,7 +82,7 @@ class LuxmedApi[F[_]: ThrowableMonad] extends ApiBase {
       .header(`Content-Type`, "application/json")
       .param("cityId", cityId.map(_.toString))
       .param("serviceVariantId", serviceVariantId.map(_.toString))
-    get[FacilitiesAndDoctors](request, session.proxy).map(_.body)
+    get[FacilitiesAndDoctors](request).map(_.body)
   }
 
   def oneDayTerms(
@@ -95,7 +104,7 @@ class LuxmedApi[F[_]: ThrowableMonad] extends ApiBase {
       .param("searchByMedicalSpecialist", false.toString)
       .param("delocalized", false.toString)
 
-    get[TermsForDayResponse](request, session.proxy).map(_.body)
+    get[TermsForDayResponse](request).map(_.body)
   }
 
   def termsIndex(
@@ -121,7 +130,7 @@ class LuxmedApi[F[_]: ThrowableMonad] extends ApiBase {
       .param("nextSearch", false.toString)
       .param("searchByMedicalSpecialist", false.toString)
       .param("delocalized", false.toString)
-    get[TermsIndexResponse](request, session.proxy).map(_.body)
+    get[TermsIndexResponse](request).map(_.body)
   }
 
   def reservationLockterm(
@@ -132,7 +141,7 @@ class LuxmedApi[F[_]: ThrowableMonad] extends ApiBase {
     val request = httpNewApi("NewPortal/reservation/lockterm", session, Some(session.cookies ++ xsrfToken.cookies))
       .header(`Content-Type`, "application/json")
       .header(`xsrf-token`, xsrfToken.token)
-    post[ReservationLocktermResponse](request, bodyOpt = Some(reservationLocktermRequest), proxy = session.proxy).map(_.body)
+    post[ReservationLocktermResponse](request, bodyOpt = Some(reservationLocktermRequest)).map(_.body)
   }
 
   def deleteTemporaryReservation(session: Session, xsrfToken: XsrfToken, temporaryReservationId: Long): F[Unit] = {
@@ -143,7 +152,7 @@ class LuxmedApi[F[_]: ThrowableMonad] extends ApiBase {
     )
       .header(`Content-Type`, "application/json")
       .header(`xsrf-token`, xsrfToken.token)
-    postVoid(request, bodyOpt = Some(Empty()), proxy = session.proxy)
+    postVoid(request, bodyOpt = Some(Empty()))
   }
 
   def reservationConfirm(
@@ -154,7 +163,7 @@ class LuxmedApi[F[_]: ThrowableMonad] extends ApiBase {
     val request = httpNewApi("NewPortal/reservation/confirm", session, Some(session.cookies ++ xsrfToken.cookies))
       .header(`Content-Type`, "application/json")
       .header(`xsrf-token`, xsrfToken.token)
-    post[ReservationConfirmResponse](request, bodyOpt = Some(reservationConfirmRequest), proxy = session.proxy).map(_.body)
+    post[ReservationConfirmResponse](request, bodyOpt = Some(reservationConfirmRequest)).map(_.body)
   }
 
   def reservationChangeTerm(
@@ -165,58 +174,55 @@ class LuxmedApi[F[_]: ThrowableMonad] extends ApiBase {
     val request = httpNewApi("NewPortal/reservation/changeterm", session, Some(session.cookies ++ xsrfToken.cookies))
       .header(`Content-Type`, "application/json")
       .header(`xsrf-token`, xsrfToken.token)
-    post[ReservationConfirmResponse](request, bodyOpt = Some(reservationChangetermRequest), proxy = session.proxy).map(_.body)
+    post[ReservationConfirmResponse](request, bodyOpt = Some(reservationChangetermRequest)).map(_.body)
   }
 
   def reservationDelete(session: Session, reservationId: Long): F[HttpResponse[String]] = {
     val request = http(s"events/Visit/$reservationId", session).header(`Content-Type`, "application/json")
-    delete(request, proxy = session.proxy)
+    delete(request)
   }
 
   private def get[T <: SerializableJsonObject](
-    request: HttpRequest,
-    proxy: Option[Proxy]
+    request: HttpRequest
   )(implicit mf: scala.reflect.Manifest[T]): F[HttpResponse[T]] = {
-    request.invoke(proxy).map(r => r.copy(body = r.body.as[T]))
+    request.invoke(currentProxy).map(r => r.copy(body = r.body.as[T]))
   }
 
   private def getList[T <: SerializableJsonObject](
-    request: HttpRequest,
-    proxy: Option[Proxy]
+    request: HttpRequest
   )(implicit mf: scala.reflect.Manifest[T]): F[HttpResponse[List[T]]] = {
-    request.invoke(proxy).map(r => r.copy(body = r.body.asList[T]))
+    request.invoke(currentProxy).map(r => r.copy(body = r.body.asList[T]))
   }
 
   private def getVoid[T <: SerializableJsonObject](
-    request: HttpRequest,
-    proxy: Option[Proxy]
+    request: HttpRequest
   )(implicit mf: scala.reflect.Manifest[T]): F[HttpResponse[Unit]] = {
-    request.invoke(proxy).map(r => r.copy(body = {}))
+    request.invoke(currentProxy).map(r => r.copy(body = {}))
   }
 
-  private def post[T <: SerializableJsonObject](request: HttpRequest, bodyOpt: Option[SerializableJsonObject] = None, proxy: Option[Proxy])(
+  private def post[T <: SerializableJsonObject](request: HttpRequest, bodyOpt: Option[SerializableJsonObject] = None)(
     implicit mf: scala.reflect.Manifest[T]
   ): F[HttpResponse[T]] = {
     val postRequest = bodyOpt match {
       case Some(body) => request.postData(body.asJson)
       case None       => request.postForm
     }
-    postRequest.invoke(proxy).map(r => r.copy(body = r.body.as[T]))
+    postRequest.invoke(currentProxy).map(r => r.copy(body = r.body.as[T]))
   }
 
-  private def postVoid(request: HttpRequest, bodyOpt: Option[SerializableJsonObject] = None, proxy: Option[Proxy]): F[Unit] = {
+  private def postVoid(request: HttpRequest, bodyOpt: Option[SerializableJsonObject] = None): F[Unit] = {
     val postRequest = bodyOpt match {
       case Some(body) => request.postData(body.asJson)
       case None       => request.postForm
     }
-    postRequest.invoke(proxy).void
+    postRequest.invoke(currentProxy).void
   }
 
-  private def delete(request: HttpRequest, proxy: Option[Proxy]): F[HttpResponse[String]] = {
-    request.postForm.method("DELETE").invoke(proxy)
+  private def delete(request: HttpRequest): F[HttpResponse[String]] = {
+    request.postForm.method("DELETE").invoke(currentProxy)
   }
 
-  private def getString(request: HttpRequest, proxy: Option[Proxy]): F[HttpResponse[String]] = {
-    request.invoke(proxy)
+  private def getString(request: HttpRequest): F[HttpResponse[String]] = {
+    request.invoke(currentProxy)
   }
 }
