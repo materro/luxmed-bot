@@ -192,18 +192,19 @@ class ApiService extends SessionSupport {
       for {
         r1 <- luxmedApi.login(username, password, clientId)
         tmpSession = Session(r1.body.accessToken, r1.body.accessToken, "", r1.cookies)
+        _ = Thread.sleep(1000 + Random.nextInt(1000))
         r2 <- luxmedApi.loginToApp(tmpSession)
         cookies = joinCookies(r1.cookies, r2.cookies, Seq(new HttpCookie("GlobalLang", "pl")))
         accessToken = r1.body.accessToken
         tokenType = r1.body.tokenType
+        _ = Thread.sleep(1000 + Random.nextInt(1000))
         r3 <- luxmedApi.getReservationPage(tmpSession, cookies)
         jwtToken = extractAccessTokenFromReservationPage(r3.body)
       } yield Session(accessToken, tokenType, jwtToken, joinCookies(cookies, r3.cookies))
     } catch {
       case e: Exception if attemptNumber < maxAttempts => {
         logger.warn(s"Couldn't login from ${attemptNumber + 1} attempt. Trying again after a short pause", e)
-        val randomDelay = Random.nextInt(1000) + 2000
-        Thread.sleep(randomDelay)
+        Thread.sleep(1000 + Random.nextInt(1000))
         fullLogin(username, encryptedPassword, attemptNumber + 1)
       }
       case e: Exception => Left(e)
