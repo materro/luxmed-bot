@@ -7,10 +7,10 @@ import scalaj.http.{BaseHttp, HttpRequest}
 import java.net.HttpCookie
 
 object ApiHttp
-    extends BaseHttp(
-      userAgent =
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
-    )
+  extends BaseHttp(
+    userAgent =
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
+  )
 
 trait ApiBase {
   private val uuid = java.util.UUID.randomUUID.toString.toUpperCase
@@ -26,14 +26,14 @@ trait ApiBase {
   private val OldApiHeaders =
     Map(
       `X-Api-Client-Identifier` -> "iPhone",
-      `Custom-User-Agent` -> s"PatientPortal; 4.40.1; $uuid; iOS; 17.4.1; iPhone14,5",
-      `User-Agent` -> "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
+      `Custom-User-Agent` -> s"PatientPortal; 4.42.0; $uuid; iOS; 18.0; iPhone16,2",
+      `User-Agent` -> "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
     )
 
   private val NewApiHeaders =
     Map(
-      `Custom-User-Agent` -> s"PatientPortal; 4.40.1; $uuid; iOS; 17.4.1; iPhone14,5",
-      `User-Agent` -> "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
+      `Custom-User-Agent` -> s"PatientPortal; 4.42.0; $uuid; iOS; 18.0; iPhone16,2",
+      `User-Agent` -> "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
     )
 
   protected def httpUnauthorized(url: String): HttpRequest = {
