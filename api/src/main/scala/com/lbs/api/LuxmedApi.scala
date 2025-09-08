@@ -94,6 +94,8 @@ class LuxmedApi[F[_]: ThrowableMonad] extends ApiBase {
       .param("searchDateFrom", dateFormatNewPortal.format(fromDate))
       .param("searchDateTo", dateFormatNewPortal.format(toDate))
       .param("searchDatePreset", 14.toString)
+      .param("processId", java.util.UUID.randomUUID.toString)
+      .param("serviceVariantSource", 0.toString)
       .param("facilitiesIds", clinicId.map(_.toString))
       .param("doctorsIds", doctorId.map(_.toString))
       .param("nextSearch", false.toString)
