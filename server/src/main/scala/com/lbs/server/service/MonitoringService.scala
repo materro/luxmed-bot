@@ -86,21 +86,14 @@ class MonitoringService extends StrictLogging {
     val lastMonitoringTime: Long = Option(lastMonitoringTimes.get(accountId)).getOrElse(now - minInterval)
     val timeSinceLastMonitoring = now - lastMonitoringTime
 
-    val lastMonitoringCount: Int = Option(activeMonitoringsCount.get(accountId)).getOrElse(0)
+    logger.debug(s"Monitoring [#${monitoring.recordId}] for account [#${accountId}] is executing")
 
-    logger.debug(
-      s"Monitoring [#${monitoring.recordId}] "
-      + s"for account [#${monitoring.accountId}] "
-      + s"is executing (${lastMonitoringCount + 1}/$MaxActiveMonitoringsPerUser)")
-
-    if (lastMonitoringCount >= MaxActiveMonitoringsPerUser) {
+    if (timeSinceLastMonitoring < minInterval) {
       logger.debug(
         s"Skipping monitoring "
-          + s"because the maximum number of active monitorings "
-          + s"per user ($MaxActiveMonitoringsPerUser) has been reached"
+          + s"because the minimum interval ($minInterval) has not passed "
+          + s"since the last monitoring ($timeSinceLastMonitoring)"
       )
-      activeMonitoringsCount.put(accountId, 0)
-      lastMonitoringTimes.put(accountId, now)
       return
     }
 
@@ -117,16 +110,7 @@ class MonitoringService extends StrictLogging {
       initializeUnprocessedRecordIds(accountId)
     }
 
-    if (timeSinceLastMonitoring < minInterval) {
-      logger.debug(
-        s"Skipping monitoring "
-          + s"because the minimum interval ($minInterval) has not passed "
-          + s"since the last monitoring ($timeSinceLastMonitoring)"
-      )
-      return
-    }
-
-    activeMonitoringsCount.put(accountId, lastMonitoringCount + 1)
+    lastMonitoringTimes.put(accountId, now)
     Option(nextUnprocessedRecordIds.get(accountId)).foreach(_.remove(monitoring.recordId))
 
     logger.debug(s"Looking for available terms...")
@@ -134,7 +118,7 @@ class MonitoringService extends StrictLogging {
       logger.debug(s"Initializing next monitorings")
       initializeUnprocessedRecordIds(accountId)
     }
-    logger.debug(s"Next monitorings for account [#${monitoring.accountId}]: ${nextUnprocessedRecordIds.get(accountId)}")
+    logger.debug(s"Next monitorings for account [#${accountId}]: ${nextUnprocessedRecordIds.get(accountId)}")
 
     val dateFrom = optimizeDateFrom(monitoring.dateFrom.toLocalDateTime, monitoring.offset)
     val termsEither = apiService.getAvailableTerms(
