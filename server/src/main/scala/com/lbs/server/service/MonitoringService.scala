@@ -241,7 +241,15 @@ class MonitoringService extends StrictLogging {
       )
       temporaryReservationId = reservationLocktermResponse.value.temporaryReservationId
       response <-
-        if (reservationLocktermResponse.value.changeTermAvailable && rebookIfExists) {
+        if (reservationLocktermResponse.value.changeTermAvailable && !rebookIfExists) {
+          logger.info(s"Service [${monitoring.serviceName}] is already booked."
+            + s" rebookIfExists is set to false, so monitoring [#${monitoring.recordId}] will be disabled")
+          apiService.deleteTemporaryReservation(
+            monitoring.accountId,
+            xsrfToken,
+            temporaryReservationId
+          ).flatMap(_ => Left(new RuntimeException("VISIT_EXISTS")))
+        } else if (reservationLocktermResponse.value.changeTermAvailable) {
           logger.info(s"Service [${monitoring.serviceName}] is already booked. Trying to update term")
           bookOrUnlockTerm(
             monitoring.accountId,
@@ -269,6 +277,9 @@ class MonitoringService extends StrictLogging {
     bookingResult match {
       case Right((_, doctorDetails)) =>
         bot.sendMessage(monitoring.source, lang(monitoring.userId).appointmentIsBooked(term, monitoring, doctorDetails))
+        deactivateMonitoring(monitoring.accountId, monitoring.recordId)
+      case Left(ex) if ex.getMessage == "VISIT_EXISTS" =>
+        bot.sendMessage(monitoring.source, lang(monitoring.userId).termIsOutdated)
         deactivateMonitoring(monitoring.accountId, monitoring.recordId)
       case Left(ex) =>
         logger.error(s"Unable to book appointment by monitoring [${monitoring.recordId}]", ex)
