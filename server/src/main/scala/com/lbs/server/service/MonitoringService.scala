@@ -13,7 +13,7 @@ import com.typesafe.scalalogging.StrictLogging
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
 
-import java.time.{LocalDateTime, ZonedDateTime}
+import java.time.{LocalTime, LocalDateTime, ZonedDateTime}
 import java.util.concurrent.{ConcurrentHashMap, ScheduledFuture}
 import javax.annotation.PostConstruct
 import scala.collection.mutable
@@ -120,7 +120,7 @@ class MonitoringService extends StrictLogging {
     }
     logger.debug(s"Next monitorings for account [#${accountId}]: ${nextUnprocessedRecordIds.get(accountId)}")
 
-    val dateFrom = optimizeDateFrom(monitoring.dateFrom.toLocalDateTime, monitoring.offset)
+    val dateFrom = optimizeDateFrom(monitoring.dateFrom.toLocalDateTime, monitoring.timeFrom, monitoring.offset)
     val termsEither = apiService.getAvailableTerms(
       monitoring.accountId,
       monitoring.cityId,
@@ -156,9 +156,14 @@ class MonitoringService extends StrictLogging {
     }
   }
 
-  private def optimizeDateFrom(date: LocalDateTime, offset: Int) = {
+  private def optimizeDateFrom(date: LocalDateTime, timeFrom: LocalTime, offset: Int): LocalDateTime = {
     val nowWithOffset = LocalDateTime.now().plusMinutes(offset)
-    if (date.isBefore(nowWithOffset)) nowWithOffset else date
+    val dateWithTimeFrom = LocalDateTime.of(date.toLocalDate, timeFrom)
+    if (dateWithTimeFrom.isBefore(nowWithOffset)) {
+      nowWithOffset
+    } else {
+      dateWithTimeFrom
+    }
   }
 
   private def initializeMonitorings(allMonitorings: Seq[Monitoring]): Unit = {
