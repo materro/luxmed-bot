@@ -56,6 +56,8 @@ class MonitoringService extends StrictLogging {
 
   private val MinMonitoringIntervalNight = 200.seconds.toMillis
 
+  private val monitoringIntervals = new ConcurrentHashMap[Long, Long]
+
   private def delay = Random.nextInt(MaxDelay.toSeconds.toInt).seconds
 
   private def period = (TimeOffsetBase.toSeconds + Random.nextInt(PeriodMaxDelta.toSeconds.toInt)).seconds
@@ -81,7 +83,10 @@ class MonitoringService extends StrictLogging {
     val now = System.currentTimeMillis
     val currentHour = (System.currentTimeMillis.milliseconds.toHours % 24).toInt
     val isNightTime = currentHour < 6 || currentHour > 22
-    val minInterval = if (isNightTime) MinMonitoringIntervalNight else MinMonitoringIntervalDay
+    val minInterval = monitoringIntervals.computeIfAbsent(
+      monitoring.recordId,
+      _ => calculateMinInterval(isNightTime)
+    )
 
     val lastMonitoringTime: Long = Option(lastMonitoringTimes.get(accountId)).getOrElse(now - minInterval)
     val timeSinceLastMonitoring = now - lastMonitoringTime
@@ -110,6 +115,7 @@ class MonitoringService extends StrictLogging {
       initializeUnprocessedRecordIds(accountId)
     }
 
+    monitoringIntervals.remove(monitoring.recordId)
     lastMonitoringTimes.put(accountId, now)
     Option(nextUnprocessedRecordIds.get(accountId)).foreach(_.remove(monitoring.recordId))
 
@@ -303,6 +309,7 @@ class MonitoringService extends StrictLogging {
   def deactivateMonitoring(accountId: JLong, monitoringId: JLong): Unit = {
     val activeMonitoringMaybe = Option(activeMonitorings.remove(monitoringId))
     Option(nextUnprocessedRecordIds.get(accountId)).foreach(_.remove(monitoringId))
+    monitoringIntervals.remove(monitoringId)
 
     activeMonitoringMaybe match {
       case Some((monitoring, future)) =>
@@ -381,6 +388,20 @@ class MonitoringService extends StrictLogging {
   }
 
   private def lang(userId: Long) = localization.lang(userId)
+
+  private def calculateMinInterval(isNightTime: Boolean): Long = {
+    val baseInterval = if (isNightTime) MinMonitoringIntervalNight else MinMonitoringIntervalDay
+    val randomExtension = Random.nextInt(3)
+    val randomSeconds = Random.nextInt(60).seconds.toMillis
+
+    val intervalWithExtension = randomExtension match {
+      case 0 => baseInterval
+      case 1 => baseInterval + 4.minutes.toMillis
+      case 2 => baseInterval + 8.minutes.toMillis
+    }
+
+    intervalWithExtension + randomSeconds
+  }
 
   @PostConstruct
   private def initialize(): Unit = {
