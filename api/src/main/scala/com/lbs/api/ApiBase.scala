@@ -15,7 +15,13 @@ object ApiHttpNew extends BaseHttp(
 )
 
 trait ApiBase {
-  private val uuid = java.util.UUID.randomUUID.toString.toUpperCase
+  private val uuid: String = {
+    val now = java.time.LocalDate.now()
+    val seed = now.getYear * 1000 + now.getDayOfYear
+    val random = new scala.util.Random(seed)
+    java.util.UUID.nameUUIDFromBytes(random.nextString(16).getBytes).toString.toUpperCase
+  }
+
   private val CommonHeaders =
     Map(
       Host -> "portalpacjenta.luxmed.pl",
@@ -28,8 +34,7 @@ trait ApiBase {
   private val OldApiHeaders =
     Map(
       `X-Api-Client-Identifier` -> "Android",
-      `Custom-User-Agent` -> s"Portal Pacjenta; 4.45.0; $uuid; Android; 34; google Pixel 8",
-      `User-Agent` -> "okhttp/4.9.1"
+      `Custom-User-Agent` -> s"Portal Pacjenta; 5.0.0; $uuid; Android; 34; google Pixel 8",
     )
 
   protected def httpUnauthorized(url: String): HttpRequest = {
