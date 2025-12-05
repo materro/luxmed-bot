@@ -184,14 +184,13 @@ class ApiService extends SessionSupport {
 
   override def fullLogin(username: String, encryptedPassword: String, attemptNumber: Int = 0): ThrowableOr[Session] = {
     val password = textEncryptor.decrypt(encryptedPassword)
-    val clientId = java.util.UUID.randomUUID.toString
     val maxAttempts = 2
     try {
       luxmedApi.setProxy()
       logger.info(s"Attempting to login using connection: ${luxmedApi.getProxy()}")
       for {
-        r1 <- luxmedApi.login(username, password, clientId)
-        tmpSession = Session(r1.body.accessToken, r1.body.accessToken, "", r1.cookies)
+        r1 <- luxmedApi.login(username, password)
+        tmpSession = Session(r1.body.accessToken, r1.body.accessToken, "", r1.cookies, username)
         _ = Thread.sleep(1000 + Random.nextInt(1000))
         r2 <- luxmedApi.loginToApp(tmpSession)
         jwtToken = extractAuthorizationTokenFromCookies(r2)
@@ -200,7 +199,7 @@ class ApiService extends SessionSupport {
         tokenType = r1.body.tokenType
         _ = Thread.sleep(1000 + Random.nextInt(1000))
         r3 <- luxmedApi.getReservationPage(tmpSession, cookies)
-      } yield Session(accessToken, tokenType, jwtToken, joinCookies(cookies, r3.cookies))
+      } yield Session(accessToken, tokenType, jwtToken, joinCookies(cookies, r3.cookies), username)
     } catch {
       case e: Exception if attemptNumber < maxAttempts => {
         logger.warn(s"Couldn't login from ${attemptNumber + 1} attempt. Trying again after a short pause", e)

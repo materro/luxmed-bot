@@ -25,10 +25,9 @@ class LuxmedApi[F[_]: ThrowableMonad] extends ApiBase {
     currentProxy
   }
 
-  def login(username: String, password: String, clientId: String = "iPhone"): F[HttpResponse[LoginResponse]] = {
-    val request = httpUnauthorized("token")
+  def login(username: String, password: String): F[HttpResponse[LoginResponse]] = {
+    val request = httpUnauthorized(username, "token")
       .header(`Content-Type`, "application/x-www-form-urlencoded")
-      .param("client_id", clientId)
       .param("grant_type", "password")
       .param("password", password)
       .param("username", username)
@@ -126,6 +125,7 @@ class LuxmedApi[F[_]: ThrowableMonad] extends ApiBase {
       .param("searchDateTo", dateFormatNewPortal.format(toDate))
       .param("searchDatePreset", 14.toString)
       .param("processId", java.util.UUID.randomUUID.toString)
+      .param("pnmExecutionId", java.util.UUID.randomUUID.toString)
       .param("serviceVariantSource", 0.toString)
       .param("facilitiesIds", clinicId.map(_.toString))
       .param("doctorsIds", doctorId.map(_.toString))

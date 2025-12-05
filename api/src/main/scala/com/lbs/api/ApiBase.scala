@@ -5,23 +5,19 @@ import com.lbs.api.http.headers._
 import scalaj.http.{BaseHttp, HttpRequest}
 
 import java.net.HttpCookie
+import java.time.LocalDate
+import java.time.DayOfWeek
+import java.util.UUID
 
 object ApiHttpOld extends BaseHttp(
-  userAgent = "okhttp/4.9.1"
+  userAgent = "okhttp/4.12.0"
 )
 
 object ApiHttpNew extends BaseHttp(
-  userAgent = "Mozilla/5.0 (Linux; Android 14; Pixel 8 Build/AP2A.240905.003.D1; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/113.0.5672.136 Mobile Safari/537.36"
+  userAgent = "Mozilla/5.0 (Linux; Android 15; Pixel 9 Pro XL Build/AP4A.250105.002; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/124.0.6367.219 Mobile Safari/537.36"
 )
 
 trait ApiBase {
-  private val uuid: String = {
-    val now = java.time.LocalDate.now()
-    val seed = now.getYear * 1000 + now.getDayOfYear
-    val random = new scala.util.Random(seed)
-    java.util.UUID.nameUUIDFromBytes(random.nextString(16).getBytes).toString.toUpperCase
-  }
-
   private val CommonHeaders =
     Map(
       Host -> "portalpacjenta.luxmed.pl",
@@ -31,20 +27,34 @@ trait ApiBase {
       `Accept-Language` -> "pl;q=1.0, pl;q=0.9, en;q=0.8"
     )
 
-  private val OldApiHeaders =
-    Map(
-      `X-Api-Client-Identifier` -> "Android",
-      `Custom-User-Agent` -> s"Portal Pacjenta; 5.0.0; $uuid; Android; 34; google Pixel 8",
-    )
+  private def generateUUID(input: String): String = {
+    val monday = LocalDate.now().minusDays(LocalDate.now().getDayOfWeek.getValue - 1)
+    val period = monday.toString()
+    UUID.nameUUIDFromBytes((input + period).getBytes("UTF-8")).toString()
+  }
 
-  protected def httpUnauthorized(url: String): HttpRequest = {
+  private def generateClientId(login: String): String = generateUUID(login)
+
+  private def generateDeviceId(login: String): String = generateUUID(s"device-$login")
+
+  private def oldApiHeaders(deviceId: String) = CommonHeaders ++ Map(
+    `X-Api-Client-Identifier` -> "Android",
+    `Custom-User-Agent` -> s"Patient Portal; 5.0.0; $deviceId; Android; 35; google Pixel 9 Pro XL",
+  )
+
+  protected def httpUnauthorized(username: String, url: String): HttpRequest = {
+    val clientId = generateClientId(username)
+    val deviceId = generateDeviceId(username)
     ApiHttpOld(s"https://portalpacjenta.luxmed.pl/PatientPortalMobileAPI/api/$url")
-      .headers(CommonHeaders ++ OldApiHeaders)
+      .param("client_id", clientId)
+      .param("device_id", deviceId)
+      .headers(oldApiHeaders(deviceId))
   }
 
   protected def http(url: String, session: Session): HttpRequest = {
+    val deviceId = generateDeviceId(session.username)
     ApiHttpOld(s"https://portalpacjenta.luxmed.pl/PatientPortalMobileAPI/api/$url")
-      .headers(CommonHeaders ++ OldApiHeaders)
+      .headers(oldApiHeaders(deviceId))
       .cookies(session.cookies)
       .header(Authorization, s"${session.tokenType} ${session.accessToken}")
   }
