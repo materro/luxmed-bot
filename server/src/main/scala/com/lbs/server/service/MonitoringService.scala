@@ -52,9 +52,9 @@ class MonitoringService extends StrictLogging {
 
   private val MaxActiveMonitoringsPerUser = 2
 
-  private val MinMonitoringIntervalDay = 205.seconds.toMillis
+  private val MinMonitoringIntervalDay = 280.seconds.toMillis
 
-  private val MinMonitoringIntervalNight = 200.seconds.toMillis
+  private val MinMonitoringIntervalNight = 250.seconds.toMillis
 
   private val monitoringIntervals = new ConcurrentHashMap[Long, Long]
 
