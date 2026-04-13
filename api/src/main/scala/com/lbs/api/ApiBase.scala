@@ -39,7 +39,7 @@ trait ApiBase {
 
   private def oldApiHeaders(deviceId: String) = CommonHeaders ++ Map(
     `X-Api-Client-Identifier` -> "Android",
-    `Custom-User-Agent` -> s"Patient Portal; 5.0.0; $deviceId; Android; 35; google Pixel 9 Pro XL",
+    `Custom-User-Agent` -> s"Patient Portal; 5.2.0; $deviceId; Android; 35; google Pixel 9 Pro XL",
   )
 
   protected def httpUnauthorized(username: String, url: String): HttpRequest = {
