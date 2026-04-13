@@ -50,11 +50,9 @@ class MonitoringService extends StrictLogging {
 
   private val PeriodMaxDelta = 20.seconds
 
-  private val MaxActiveMonitoringsPerUser = 2
+  private val MinMonitoringIntervalDay = 205.seconds.toMillis
 
-  private val MinMonitoringIntervalDay = 280.seconds.toMillis
-
-  private val MinMonitoringIntervalNight = 250.seconds.toMillis
+  private val MinMonitoringIntervalNight = 200.seconds.toMillis
 
   private val monitoringIntervals = new ConcurrentHashMap[Long, Long]
 
@@ -391,16 +389,10 @@ class MonitoringService extends StrictLogging {
 
   private def calculateMinInterval(isNightTime: Boolean): Long = {
     val baseInterval = if (isNightTime) MinMonitoringIntervalNight else MinMonitoringIntervalDay
-    val randomExtension = Random.nextInt(3)
-    val randomSeconds = Random.nextInt(60).seconds.toMillis
+    val randomMinutes = Random.nextInt(2).minutes.toMillis
+    val randomSeconds = Random.nextInt(30).seconds.toMillis
 
-    val intervalWithExtension = randomExtension match {
-      case 0 => baseInterval
-      case 1 => baseInterval + 4.minutes.toMillis
-      case 2 => baseInterval + 8.minutes.toMillis
-    }
-
-    intervalWithExtension + randomSeconds
+    baseInterval + randomMinutes + randomSeconds
   }
 
   @PostConstruct
